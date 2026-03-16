@@ -160,6 +160,18 @@ tr:hover td{background:var(--gl)}
 .ev-court-line{flex:1;height:1px;background:var(--b1)}
 .ev-court-cards{display:flex;flex-wrap:wrap;gap:9px}
 .ev-court-badge{font-size:9px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(59,130,246,.1);color:var(--vc,#3b82f6);border:1px solid rgba(59,130,246,.2);white-space:nowrap;flex-shrink:0}
+/* ── COURTS EDITOR ── */
+.courts-editor{border:1px solid var(--b2);border-radius:6px;overflow:hidden;margin-top:4px}
+.court-item{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--b1);background:var(--surf)}
+.court-item:last-child{border-bottom:none}
+.court-item input[type=text]{flex:1;padding:4px 8px;background:var(--gl);border:1px solid var(--b1);border-radius:4px;color:var(--t1);font-size:12px;font-family:var(--sans);outline:none}
+.court-item input[type=text]:focus{border-color:var(--acc)}
+.court-toggle{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--t2);cursor:pointer;white-space:nowrap;flex-shrink:0}
+.court-del{background:none;border:none;color:var(--t3);cursor:pointer;padding:2px 6px;font-size:14px;line-height:1;transition:color .15s;flex-shrink:0}
+.court-del:hover{color:var(--red)}
+.court-add-btn{width:100%;padding:8px;background:none;border:none;color:var(--acc);font-size:12px;cursor:pointer;font-family:var(--sans);text-align:center;transition:background .15s}
+.court-add-btn:hover{background:var(--gl)}
+.court-empty{padding:12px;text-align:center;font-size:11px;color:var(--t3)}
 /* ── SEARCH ── */
 .search-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--b1)}
 .search-input{flex:1;min-width:200px;padding:8px 14px;background:var(--gl);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-size:13px;font-family:var(--sans);outline:none;transition:border-color .15s}
@@ -284,8 +296,16 @@ input[type=checkbox].cb{width:15px;height:15px;accent-color:var(--acc);cursor:po
       </div>
     </div>
     <div class="field">
-      <label>场地编号 <span style="font-weight:400;opacity:.55;text-transform:none;letter-spacing:0">（选填 — 一馆多场时填写，如 A场、B场、1号场地）</span></label>
-      <input type="text" id="evtCourt" placeholder="如 A场、B场、1号场地…">
+      <label>子场地 <span style="font-weight:400;opacity:.55;text-transform:none;letter-spacing:0">（选填 — 场馆已设置子场地时可直接选择）</span></label>
+      <div style="display:flex;gap:6px">
+        <select id="evtCourtSel" style="flex:1;padding:9px 12px;background:var(--surf);border:1px solid var(--b2);border-radius:6px;color:var(--t1);font-size:13px;font-family:var(--sans);outline:none" onchange="if(this.value!=='__custom__')document.getElementById('evtCourt').value=this.value;document.getElementById('evtCourtCustom').style.display=this.value==='__custom__'?'block':'none'">
+          <option value="">不指定</option>
+        </select>
+      </div>
+      <div id="evtCourtCustom" style="display:none;margin-top:6px">
+        <input type="text" id="evtCourt" placeholder="自定义场地名…">
+      </div>
+      <input type="hidden" id="evtCourtHidden">
     </div>
     <div class="field-row">
       <div class="field">
@@ -355,6 +375,13 @@ input[type=checkbox].cb{width:15px;height:15px;accent-color:var(--acc);cursor:po
     <div class="field">
       <label>位置</label>
       <input type="text" id="venueLocation" placeholder="三亚">
+    </div>
+    <div class="field">
+      <label>子场地 <span style="font-weight:normal;color:var(--t3);font-size:10px">（一馆多赛时设置，可启用/停用控制前台显示）</span></label>
+      <div class="courts-editor" id="courtsEditor">
+        <div class="court-empty">暂无子场地，点击下方添加</div>
+      </div>
+      <button class="court-add-btn" onclick="addCourt()" style="border:1px solid var(--b2);border-top:none;border-radius:0 0 6px 6px">＋ 添加子场地</button>
     </div>
     <div class="field" style="display:flex;align-items:center;gap:10px">
       <input type="checkbox" id="venueActive" style="width:auto" checked>
@@ -696,7 +723,42 @@ async function bulkStatusEvts(){
   await renderEvents();
 }
 
-/* ── COURT HELPERS ── */
+/* ── VENUE LOCATION / COURTS JSON HELPERS ── */
+function parseVenueLocJson(loc){
+  if(!loc) return {loc:'',courts:[]};
+  try{const j=JSON.parse(loc);if(j.loc!==undefined) return {loc:j.loc||'',courts:j.courts||[]};}catch(e){}
+  return {loc:loc,courts:[]};
+}
+function buildVenueLocJson(locText,courts){
+  const c=(courts||[]).filter(c=>c.n);
+  if(!c.length) return locText||'';
+  return JSON.stringify({loc:locText||'',courts:c});
+}
+
+/* ── COURTS EDITOR STATE ── */
+let _editingCourts=[];
+function renderCourtsEditor(){
+  const el=document.getElementById('courtsEditor');
+  if(!el) return;
+  if(!_editingCourts.length){el.innerHTML='<div class="court-empty">暂无子场地</div>';return;}
+  el.innerHTML=_editingCourts.map((c,i)=>`
+    <div class="court-item">
+      <input type="text" value="${c.n.replace(/"/g,'&quot;')}" oninput="_editingCourts[${i}].n=this.value"
+        placeholder="场地名称，如 A场">
+      <label class="court-toggle">
+        <input type="checkbox" ${c.on!==false?'checked':''} style="width:auto;margin:0"
+          onchange="_editingCourts[${i}].on=this.checked;renderCourtsEditor()">
+        <span style="color:${c.on!==false?'var(--acc)':'var(--t3)'}">${c.on!==false?'显示':'隐藏'}</span>
+      </label>
+      <button class="court-del" onclick="_editingCourts.splice(${i},1);renderCourtsEditor()" title="删除">✕</button>
+    </div>`).join('');
+}
+function addCourt(){
+  _editingCourts.push({n:'场地'+(String.fromCharCode(65+_editingCourts.length)),on:true});
+  renderCourtsEditor();
+}
+
+/* ── COURT NOTES HELPERS ── */
 // Court name is stored as "[场地:X] notes-text" prefix in the notes field
 function parseCourtNotes(raw){
   if(!raw) return {court:'',notes:''};
@@ -710,44 +772,80 @@ function buildCourtNotes(court,notes){
   return n||null;
 }
 
+/* ── COURT SELECT HELPER ── */
+function updateCourtSelect(venueId, currentCourt){
+  const venue=VENUES.find(v=>v.id===venueId);
+  const {courts}=parseVenueLocJson(venue?.location||'');
+  const sel=document.getElementById('evtCourtSel');
+  const customDiv=document.getElementById('evtCourtCustom');
+  if(!sel) return;
+  if(courts.length>0){
+    sel.innerHTML=`<option value="">不指定</option>`
+      +courts.map(c=>`<option value="${c.n}">${c.n}${c.on===false?' (已隐藏)':''}</option>`).join('')
+      +`<option value="__custom__">＋ 自定义…</option>`;
+    const inList=courts.find(c=>c.n===currentCourt);
+    if(currentCourt&&!inList){
+      sel.value='__custom__';
+      document.getElementById('evtCourt').value=currentCourt;
+      customDiv.style.display='block';
+    } else {
+      sel.value=currentCourt||'';
+      customDiv.style.display='none';
+    }
+  } else {
+    sel.innerHTML=`<option value="">不指定</option><option value="__custom__">＋ 自定义…</option>`;
+    if(currentCourt){sel.value='__custom__';document.getElementById('evtCourt').value=currentCourt;customDiv.style.display='block';}
+    else{sel.value='';customDiv.style.display='none';}
+  }
+}
+function getCourtFromModal(){
+  const sel=document.getElementById('evtCourtSel');
+  if(!sel) return '';
+  if(sel.value==='__custom__') return document.getElementById('evtCourt').value.trim();
+  return sel.value||'';
+}
+
 /* ── EVENT MODAL ── */
 async function openEvtModal(ev, preVenueId){
   await loadVenueMap();
-  const sel=document.getElementById('evtVenue');
-  sel.innerHTML=VENUES.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  const venSel=document.getElementById('evtVenue');
+  venSel.innerHTML=VENUES.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  // Update court select when venue changes
+  venSel.onchange=()=>updateCourtSelect(venSel.value,'');
   if(ev){
     const {court,notes}=parseCourtNotes(ev.notes);
     document.getElementById('evtModalTitle').textContent='编辑赛程';
     document.getElementById('evtId').value=ev.id;
     document.getElementById('evtName').value=ev.name||'';
-    document.getElementById('evtVenue').value=ev.venue_id||'';
+    venSel.value=ev.venue_id||'';
     document.getElementById('evtRound').value=ev.round||'其他';
-    document.getElementById('evtCourt').value=court;
     document.getElementById('evtStart').value=toLocalDT(ev.start_time);
     document.getElementById('evtEnd').value=toLocalDT(ev.end_time);
     document.getElementById('evtCh').value=ev.broadcast_channel||'';
     document.getElementById('evtStatus').value=ev.status||'scheduled';
     document.getElementById('evtMedal').checked=ev.is_medal_event||false;
     document.getElementById('evtNotes').value=notes;
+    updateCourtSelect(ev.venue_id||'', court);
   } else {
     document.getElementById('evtModalTitle').textContent='添加赛程';
     document.getElementById('evtId').value='';
     document.getElementById('evtName').value='';
     document.getElementById('evtRound').value='预赛';
-    document.getElementById('evtCourt').value='';
     document.getElementById('evtStart').value='';
     document.getElementById('evtEnd').value='';
     document.getElementById('evtCh').value='';
     document.getElementById('evtNotes').value='';
     document.getElementById('evtMedal').checked=false;
     document.getElementById('evtStatus').value='scheduled';
-    if(preVenueId) document.getElementById('evtVenue').value=preVenueId;
+    const vid=preVenueId||VENUES[0]?.id||'';
+    venSel.value=vid;
+    updateCourtSelect(vid,'');
   }
   document.getElementById('evtModal').classList.add('show');
 }
 async function saveEvent(){
   const id=document.getElementById('evtId').value;
-  const court=document.getElementById('evtCourt').value.trim();
+  const court=getCourtFromModal();
   const notesRaw=document.getElementById('evtNotes').value;
   const payload={
     name:document.getElementById('evtName').value.trim(),
@@ -824,7 +922,7 @@ function renderVenueTable(){
           <td style="color:var(--t1);font-weight:500">${v.name}</td>
           <td>${v.short_name||'—'}</td>
           <td>${v.sport||'—'}</td>
-          <td>${v.location||'—'}</td>
+          <td>${(()=>{const {loc,courts}=parseVenueLocJson(v.location||'');const c=courts.filter(x=>x.on!==false);return (loc||'—')+(c.length?` <span style="font-size:10px;color:var(--acc)">${c.map(x=>x.n).join('/')}</span>`:'')})()} </td>
           <td><div style="display:flex;align-items:center;gap:6px"><div style="width:14px;height:14px;border-radius:3px;background:${v.color||'#888'}"></div><span style="font-size:11px;color:var(--t3)">${v.color||'—'}</span></div></td>
           <td><span class="badge ${v.is_active?'sched':'done'}">${v.is_active?'启用':'停用'}</span></td>
           <td><div style="display:flex;gap:4px">
@@ -880,18 +978,23 @@ function openVenueModal(v){
   document.getElementById('venueShort').value=v?.short_name||'';
   document.getElementById('venueSport').value=v?.sport||'';
   document.getElementById('venueColor').value=v?.color||'#3b82f6';
-  document.getElementById('venueLocation').value=v?.location||'';
   document.getElementById('venueActive').checked=v?.is_active!==false;
+  // Parse location JSON → populate location text + courts editor
+  const {loc,courts}=parseVenueLocJson(v?.location||'');
+  document.getElementById('venueLocation').value=loc;
+  _editingCourts=courts.map(c=>({...c}));
+  renderCourtsEditor();
   document.getElementById('venueModal').classList.add('show');
 }
 async function saveVenue(){
   const id=document.getElementById('venueId').value;
+  const locText=document.getElementById('venueLocation').value.trim();
   const payload={
     name:document.getElementById('venueName').value.trim(),
     short_name:document.getElementById('venueShort').value.trim(),
     sport:document.getElementById('venueSport').value.trim(),
     color:document.getElementById('venueColor').value,
-    location:document.getElementById('venueLocation').value.trim(),
+    location:buildVenueLocJson(locText, _editingCourts),
     is_active:document.getElementById('venueActive').checked,
   };
   if(!payload.name){alert('请填写项目名称');return;}

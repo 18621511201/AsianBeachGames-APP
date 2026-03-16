@@ -801,14 +801,37 @@ function parseCourt(notes){
   const m=notes.match(/^\[场地:([^\]]+)\]/);
   return m?m[1].trim():'';
 }
+function parseVenueLocJson(loc){
+  if(!loc) return {loc:'',courts:[]};
+  try{const j=JSON.parse(loc);if(j.loc!==undefined) return {loc:j.loc||'',courts:j.courts||[]};}catch(e){}
+  return {loc:loc,courts:[]};
+}
 
 // Returns [{label:'', evts:[]}]
-// Priority: explicit court names > auto collision detection
+// Priority: ① venue-defined courts (admin管理的子场地) → ② event-tagged courts → ③ auto collision detect
 function getVenueLanes(venueId){
+  const venue=VENUES.find(v=>v.id===venueId);
+  const {courts:definedCourts}=parseVenueLocJson(venue?.location||'');
+  const activeCourts=definedCourts.filter(c=>c.on!==false);
   const evts=allEvts.filter(e=>e.venue_id===venueId);
   if(!evts.length) return [{label:'',evts:[]}];
 
-  // ① Explicit court names set in notes
+  // ① Venue has defined sub-courts → show each active court as a lane
+  if(activeCourts.length>0){
+    const lanes=activeCourts.map(c=>({
+      label:c.n,
+      evts:evts.filter(e=>parseCourt(e.notes)===c.n)
+    }));
+    // Catch-all for events not tagged to any court
+    const taggedIds=new Set(evts.filter(e=>parseCourt(e.notes)).map(e=>e.id));
+    const untagged=evts.filter(e=>!taggedIds.has(e.id));
+    if(untagged.length) lanes.push({label:isZh?'其他场地':'Other',evts:untagged});
+    // Only return lanes that have events
+    const nonempty=lanes.filter(ln=>ln.evts.length>0);
+    return nonempty.length>0?nonempty:[{label:'',evts}];
+  }
+
+  // ② Events have explicit court tags in notes
   const hasExplicit=evts.some(e=>parseCourt(e.notes));
   if(hasExplicit){
     const map={};
@@ -821,21 +844,20 @@ function getVenueLanes(venueId){
       if(a==='__none__') return 1; if(b==='__none__') return -1;
       return a.localeCompare(b,'zh');
     });
-    return keys.map(k=>({label:k==='__none__'?'':k, evts:map[k]}));
+    return keys.map(k=>({label:k==='__none__'?'':k,evts:map[k]}));
   }
 
-  // ② Auto-detect overlapping events → assign to lanes
+  // ③ Auto-detect overlapping events → assign to lanes
   const sorted=evts.slice().sort((a,b)=>a.start_time-b.start_time);
-  const lanes=[]; // [{label, evts:[]}]
+  const lanes=[];
   sorted.forEach(ev=>{
     let placed=false;
     for(let i=0;i<lanes.length;i++){
-      const overlaps=lanes[i].evts.some(le=>ev.start_time<le.end_time && ev.end_time>le.start_time);
+      const overlaps=lanes[i].evts.some(le=>ev.start_time<le.end_time&&ev.end_time>le.start_time);
       if(!overlaps){lanes[i].evts.push(ev);placed=true;break;}
     }
     if(!placed) lanes.push({label:'',evts:[ev]});
   });
-  // Only label lanes if more than one (otherwise identical to before)
   if(lanes.length>1) lanes.forEach((ln,i)=>{ln.label=isZh?`场地 ${i+1}`:`Court ${i+1}`;});
   return lanes;
 }
@@ -1336,8 +1358,10 @@ function getVenueName(v){
   return _translateStr(v.short_name||v.name);
 }
 function getVenueSubName(v){
-  if(isZh) return v.name;
-  return _translateStr(v.name);
+  const {loc}=parseVenueLocJson(v.location||'');
+  const sub=loc||v.name;
+  if(isZh) return sub;
+  return _translateStr(sub);
 }
 function getRoundName(r){
   if(isZh||!r) return r||'';
