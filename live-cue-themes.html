@@ -795,20 +795,49 @@ function getActiveVenues(){
   return VENUES.filter(v=>ids.has(v.id));
 }
 
-/* ── Court helpers ── */
+/* ── Court / Lane helpers ── */
 function parseCourt(notes){
   if(!notes) return '';
   const m=notes.match(/^\[场地:([^\]]+)\]/);
   return m?m[1].trim():'';
 }
-function getVenueCourts(venueId){
+
+// Returns [{label:'', evts:[]}]
+// Priority: explicit court names > auto collision detection
+function getVenueLanes(venueId){
   const evts=allEvts.filter(e=>e.venue_id===venueId);
-  if(!evts.length) return [''];
-  const courtSet=new Set(evts.map(e=>parseCourt(e.notes)));
-  const named=[...courtSet].filter(Boolean).sort((a,b)=>a.localeCompare(b,'zh'));
-  if(!named.length) return [''];          // all events have no court → single row
-  const hasBucket=courtSet.has('');
-  return [...named, ...(hasBucket?['']:[])]; // named courts first, then unnamed bucket
+  if(!evts.length) return [{label:'',evts:[]}];
+
+  // ① Explicit court names set in notes
+  const hasExplicit=evts.some(e=>parseCourt(e.notes));
+  if(hasExplicit){
+    const map={};
+    evts.forEach(e=>{
+      const k=parseCourt(e.notes)||'__none__';
+      if(!map[k]) map[k]=[];
+      map[k].push(e);
+    });
+    const keys=Object.keys(map).sort((a,b)=>{
+      if(a==='__none__') return 1; if(b==='__none__') return -1;
+      return a.localeCompare(b,'zh');
+    });
+    return keys.map(k=>({label:k==='__none__'?'':k, evts:map[k]}));
+  }
+
+  // ② Auto-detect overlapping events → assign to lanes
+  const sorted=evts.slice().sort((a,b)=>a.start_time-b.start_time);
+  const lanes=[]; // [{label, evts:[]}]
+  sorted.forEach(ev=>{
+    let placed=false;
+    for(let i=0;i<lanes.length;i++){
+      const overlaps=lanes[i].evts.some(le=>ev.start_time<le.end_time && ev.end_time>le.start_time);
+      if(!overlaps){lanes[i].evts.push(ev);placed=true;break;}
+    }
+    if(!placed) lanes.push({label:'',evts:[ev]});
+  });
+  // Only label lanes if more than one (otherwise identical to before)
+  if(lanes.length>1) lanes.forEach((ln,i)=>{ln.label=isZh?`场地 ${i+1}`:`Court ${i+1}`;});
+  return lanes;
 }
 
 function renderVenues(){
@@ -817,32 +846,25 @@ function renderVenues(){
   let html='';
   activeVenues.forEach(v=>{
     const icon=getSportIcon(v.short_name||v.name);
-    const courts=getVenueCourts(v.id);
-    const isMulti=courts.length>1||(courts.length===1&&courts[0]!=='');
-    courts.forEach((court,i)=>{
+    const lanes=getVenueLanes(v.id);
+    lanes.forEach((ln,i)=>{
       const isFirst=i===0;
       if(isFirst){
-        // Main venue row: always show icon + venue name
-        html+=`<div class="vrow${courts.length>1?' vrow-first':''}" style="--vc:${v.color}">
+        html+=`<div class="vrow" style="--vc:${v.color}">
           <div class="vi" style="flex-direction:row;align-items:center;gap:6px">
             <span class="vsport">${icon}</span>
             <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
               <span class="vn">${getVenueName(v)}</span>
-              ${court
-                ? `<span class="vcourt-tag" style="border-color:${v.color}33;background:${v.color}14;color:${v.color}">${court}</span>`
-                : `<span class="vz">${getVenueSubName(v)}</span>`}
+              ${ln.label
+                ?`<span class="vcourt-tag" style="border-color:${v.color}33;background:${v.color}14;color:${v.color}">${ln.label}</span>`
+                :`<span class="vz">${getVenueSubName(v)}</span>`}
             </div>
           </div>
         </div>`;
       } else {
-        // Sub-court row: indent, no icon, just court tag
         html+=`<div class="vrow vrow-court" style="--vc:${v.color}">
           <div class="vi" style="flex-direction:row;align-items:center;gap:6px;padding-left:30px">
-            <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-              ${court
-                ? `<span class="vcourt-tag" style="border-color:${v.color}33;background:${v.color}14;color:${v.color}">${court}</span>`
-                : `<span class="vz" style="font-style:italic">${isZh?'其他场地':'Other court'}</span>`}
-            </div>
+            <span class="vcourt-tag" style="border-color:${v.color}33;background:${v.color}14;color:${v.color}">${ln.label||'—'}</span>
           </div>
         </div>`;
       }
@@ -883,26 +905,22 @@ function renderRows(gw){
   const gr=document.getElementById('grs'); gr.innerHTML='';
   const totalMins=gw/PPM;
   const activeVenues=getActiveVenues();
-  // Grid line step based on zoom
   let glStep;
   if(PPM>=5) glStep=60;
   else if(PPM>=0.3) glStep=360;
   else glStep=1440;
 
   activeVenues.forEach(venue=>{
-    // Split into one row per court (or single row if no courts defined)
-    const courts=getVenueCourts(venue.id);
-    courts.forEach(court=>{
+    const lanes=getVenueLanes(venue.id);
+    lanes.forEach((ln,laneIdx)=>{
       const row=document.createElement('div');
       row.className='gr'; row.style.width=gw+'px';
-      // Subtle tint for sub-court rows
-      if(court) row.style.background=`${venue.color}08`;
+      // Subtle alternating tint for sub-court rows so they're visually distinct
+      if(laneIdx>0) row.style.background=`${venue.color}0a`;
       for(let m=0;m<=totalMins;m+=glStep){
         const gl=document.createElement('div');gl.className='gl';gl.style.left=(m*PPM)+'px';row.appendChild(gl);
       }
-      // Events for this venue + this court slot
-      const vevts=allEvts.filter(e=>e.venue_id===venue.id && parseCourt(e.notes)===(court||''));
-      vevts.forEach(ev=>{
+      ln.evts.forEach(ev=>{
         const st=evStatus(ev);
         if(sf!=='all'&&st!==sf) return;
         if(selectedRounds.size>0&&!selectedRounds.has(ev.round)) return;
@@ -920,10 +938,10 @@ function renderRows(gw){
         b.innerHTML=`<div class="evi">
           ${ev.is_medal_event?'<span class="ev-medal">🥇</span>':''}
           <span class="ev-name">${isZh?ev.name:getEventName(ev.name)}</span>
-          <span class="ev-rnd">${getRoundName(ev.round)}</span>
+          ${ln.label?`<span class="ev-rnd" style="opacity:.9">${ln.label}</span>`:`<span class="ev-rnd">${getRoundName(ev.round)}</span>`}
           <span class="ev-t">${sh}–${eh}</span>
         </div>`;
-        b.addEventListener('mouseenter',e=>showTT(e,venue,ev,st,court));
+        b.addEventListener('mouseenter',e=>showTT(e,venue,ev,st,ln.label));
         b.addEventListener('mousemove',moveTT);
         b.addEventListener('mouseleave',hideTT);
         row.appendChild(b);
