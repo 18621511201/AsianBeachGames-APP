@@ -772,6 +772,7 @@ function renderVenueTable(){
         <span class="sec-cnt" id="venueCnt">${filt.length} / ${VENUES.length}</span>
         <div class="sec-actions">
           <input class="search-input" id="venueQ" placeholder="搜索场馆名称 / 项目…" value="${_venueQ.replace(/"/g,'&quot;')}" oninput="_venueQ=this.value;renderVenueTable()" style="width:200px">
+          <button class="btn btn-primary btn-sm" onclick="openVenueModal(null)">＋ 添加场馆</button>
         </div>
       </div>
       <div id="vBulk" class="bulk-bar" style="display:none">
