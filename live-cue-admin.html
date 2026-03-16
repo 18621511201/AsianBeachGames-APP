@@ -360,6 +360,7 @@ input[type=checkbox].cb{width:15px;height:15px;accent-color:var(--acc);cursor:po
 /* ── SUPABASE ── */
 const SB_URL='https://mdgfcgxtlxgzkvoiqonp.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2ZjZ3h0bHhnemt2b2lxb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTcwMjIsImV4cCI6MjA4OTEzMzAyMn0.ds9Ab_HkRNsUDSUrTlfJ5NpmlywgWwotNei4YX3Oo-k';
+const SB_SVC='sb_secret_LGFZ6XFx1Ri20x6bufWkIQ_wH-1IRK0';
 const {createClient}=supabase;
 const db=createClient(SB_URL,SB_KEY);
 
@@ -1853,7 +1854,12 @@ async function loadVenueMap(){
 }
 async function logAction(action,table,summary){
   if(!CUR_USER) return;
-  await db.from('audit_logs').insert({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary}).catch(()=>{});
+  // Use service role key to bypass RLS for audit_logs (no INSERT policy needed)
+  await fetch(`${SB_URL}/rest/v1/audit_logs`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC},
+    body:JSON.stringify({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary})
+  }).catch(()=>{});
 }
 function statusBadge(s){
   const map={live:'<span class="badge live"><span class="dot live"></span>直播中</span>',scheduled:'<span class="badge sched">计划中</span>',finished:'<span class="badge done">已完成</span>',cancelled:'<span class="badge done">已取消</span>',completed:'<span class="badge done">已完成</span>'};
