@@ -79,7 +79,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--t1);
 [data-theme="beach"]     .brand-logo{background:linear-gradient(135deg,#041e3a,#07345a)}
 [data-theme="fashion"]   .brand-logo{background:#111;border-color:#c9a84c33}
 [data-theme="chinese"]   .brand-logo{background:linear-gradient(135deg,#2e000c,#480010);border-color:#ffd70033;box-shadow:0 0 10px rgba(255,26,46,.2)}
-.brand-logo img{width:32px;height:32px;object-fit:contain}
+.brand-logo img{width:40px;height:40px;object-fit:contain;background:#fff;border-radius:5px;padding:2px}
 .brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
 .bn{font-size:14px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--bf)}
 [data-theme="cyberpunk"] .bn{font-size:11px;letter-spacing:.06em;text-transform:uppercase;text-shadow:0 0 10px var(--accent)}
@@ -441,11 +441,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--t1);
     <div class="hi">
       <div class="brand">
         <div class="brand-logo">
-          <img src="https://upload.wikimedia.org/wikipedia/en/thumb/8/82/Asian_Beach_Games_logo.png/200px-Asian_Beach_Games_logo.png" alt="ABG" onerror="this.style.display='none'">
+          <img src="./abg-logo.jpeg" alt="6th ABG Sanya 2026">
         </div>
         <div class="brand-text">
           <span class="bn" id="appTitle">亚沙会智慧转播赛程管理系统</span>
-          <span class="bs" id="appSub">Asian Beach Games · Broadcast Management</span>
+          <span class="bs" id="appSub">6th Asian Beach Games · Sanya 2026</span>
         </div>
       </div>
       <div class="ck">
@@ -1399,7 +1399,7 @@ function toggleLang(){
   document.getElementById('adminLbl').textContent=isZh?'管理后台':'Admin';
   document.getElementById('syncLbl').textContent=isZh?'当地时间':'Local Time';
   document.getElementById('appTitle').textContent=isZh?'亚沙会智慧转播赛程管理系统':'ABG Broadcast Schedule System';
-  document.getElementById('appSub').textContent=isZh?'Asian Beach Games · Broadcast Management':'Asian Beach Games · Broadcast Management';
+  document.getElementById('appSub').textContent='6th Asian Beach Games · Sanya 2026';
   // Theme bar
   document.querySelector('.tbar-lbl').textContent=isZh?'风格':'Theme';
   document.querySelector('[data-t="cyberpunk"]').lastChild.textContent=isZh?'赛博朋克':'Cyberpunk';
