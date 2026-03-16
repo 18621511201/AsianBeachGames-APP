@@ -126,6 +126,41 @@ tr:hover td{background:var(--gl)}
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
 /* ── RESPONSIVE ── */
 @media(max-width:768px){.sidebar{display:none}.stat-grid{grid-template-columns:1fr 1fr}.field-row{grid-template-columns:1fr}}
+/* ── SCHEDULE VIEW ── */
+.sched-layout{display:flex;gap:16px;align-items:flex-start}
+.sched-left{width:234px;flex-shrink:0;background:var(--surf);border:1px solid var(--b1);border-radius:var(--r);padding:8px;position:sticky;top:0;max-height:calc(100vh - 110px);overflow-y:auto}
+.sched-left-hdr{display:flex;justify-content:space-between;align-items:center;padding:4px 8px 10px;border-bottom:1px solid var(--b1);margin-bottom:8px}
+.sched-right{flex:1;min-width:0}
+.sv-venue{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:7px;cursor:pointer;transition:background .15s;border:1px solid transparent;margin-bottom:3px}
+.sv-venue:hover{background:var(--gl);border-color:var(--b1)}
+.sv-venue.sv-sel{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.28)}
+.sv-vbar{width:4px;height:34px;border-radius:2px;background:var(--vc,#3b82f6);flex-shrink:0}
+.sv-vinfo{flex:1;min-width:0}
+.sv-vname{font-size:12px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sv-vmeta{font-size:10px;color:var(--t3);margin-top:2px}
+.sv-vact{display:flex;gap:3px;flex-shrink:0;opacity:0;transition:opacity .15s}
+.sv-venue:hover .sv-vact{opacity:1}
+.ev-group{margin-bottom:22px}
+.ev-group-hdr{display:flex;align-items:center;gap:8px;padding:6px 0 9px;border-bottom:2px solid var(--b1);margin-bottom:10px}
+.ev-group-date{font-size:13px;font-weight:700;color:var(--acl)}
+.ev-group-day{font-size:11px;color:var(--t3);background:var(--gl);padding:2px 8px;border-radius:99px;border:1px solid var(--b1)}
+.ev-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(218px,1fr));gap:9px}
+.ev-card{background:var(--surf);border:1px solid var(--b1);border-left:3px solid var(--vc,#3b82f6);border-radius:var(--r);padding:10px 12px;transition:all .15s;position:relative}
+.ev-card:hover{border-color:var(--b2);box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.ev-card-top{display:flex;align-items:center;gap:5px;margin-bottom:5px}
+.ev-card-time{font-size:11px;font-family:var(--mono);color:var(--t2);font-weight:600}
+.ev-card-name{font-size:12px;font-weight:600;color:var(--t1);margin-bottom:8px;line-height:1.4;min-height:16px}
+.ev-card-bot{display:flex;align-items:center;gap:4px}
+.ev-card-acts{margin-left:auto;display:flex;gap:3px;opacity:0;transition:opacity .15s}
+.ev-card:hover .ev-card-acts{opacity:1}
+/* ── SEARCH ── */
+.search-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:14px 20px;border-bottom:1px solid var(--b1)}
+.search-input{flex:1;min-width:200px;padding:8px 14px;background:var(--gl);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-size:13px;font-family:var(--sans);outline:none;transition:border-color .15s}
+.search-input:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(59,130,246,.12)}
+.search-select{padding:8px 10px;background:var(--gl);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-size:12px;font-family:var(--sans);outline:none;cursor:pointer}
+.search-select option{background:var(--elev)}
+.search-results{padding:0}
+.sr-empty{padding:32px;text-align:center;color:var(--t3);font-size:12px}
 </style>
 </head>
 <body>
@@ -164,8 +199,11 @@ tr:hover td{background:var(--gl)}
       <a onclick="show('dashboard')" class="active" data-p="dashboard">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>仪表盘
       </a>
+      <a onclick="show('schedule')" data-p="schedule">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>赛程管理
+      </a>
       <a onclick="show('events')" data-p="events">
-        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>赛事管理
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>赛事列表
       </a>
       <a onclick="show('venues')" data-p="venues">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>场馆管理
@@ -365,11 +403,12 @@ document.getElementById('loginPwd').addEventListener('keydown',e=>{if(e.key==='E
 /* ── NAVIGATION ── */
 async function show(page){
   document.querySelectorAll('#nav a[data-p]').forEach(a=>a.classList.toggle('active',a.dataset.p===page));
-  const titles={dashboard:'仪表盘',events:'赛事管理',venues:'场馆管理',import:'导入数据',audit:'操作日志',export:'导出报表'};
+  const titles={dashboard:'仪表盘',schedule:'赛程管理',events:'赛事列表',venues:'场馆管理',import:'导入数据',audit:'操作日志',export:'导出报表'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('pageActions').innerHTML='';
   document.getElementById('pageSub').textContent='';
   if(page==='dashboard') await renderDashboard();
+  else if(page==='schedule') await renderSchedule();
   else if(page==='events') await renderEvents();
   else if(page==='venues') await renderVenues();
   else if(page==='import') renderImport();
@@ -397,10 +436,32 @@ async function renderDashboard(){
       <div class="stat-card" style="border-color:rgba(251,191,36,.2)"><div class="sc-label" style="color:#fbbf24">金牌赛事</div><div class="sc-num" style="color:#f59e0b">${medal}</div><div class="sc-sub">🥇 决赛/颁奖</div></div>
       <div class="stat-card"><div class="sc-label">启用场馆</div><div class="sc-num">${active}</div><div class="sc-sub">共 ${(vn||[]).length} 个</div></div>
     </div>
+    <div class="section" style="margin-bottom:20px">
+      <div class="sec-head">
+        <span class="sec-title">🔍 内容搜索与修改</span>
+        <span class="sec-cnt" id="srCnt">—</span>
+      </div>
+      <div class="search-bar">
+        <input class="search-input" id="dashSQ" placeholder="输入赛事名称、场馆、赛次关键字…" oninput="dashSearch()" autocomplete="off">
+        <select class="search-select" id="dashSRound" onchange="dashSearch()">
+          <option value="">全部赛次</option>
+          <option>预赛</option><option>半决赛</option><option>决赛</option><option>小组赛</option><option>其他</option>
+        </select>
+        <select class="search-select" id="dashSStatus" onchange="dashSearch()">
+          <option value="">全部状态</option>
+          <option value="scheduled">计划中</option>
+          <option value="live">直播中</option>
+          <option value="finished">已完成</option>
+          <option value="cancelled">已取消</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('dashSQ').value='';document.getElementById('dashSRound').value='';document.getElementById('dashSStatus').value='';dashSearch()">清除</button>
+      </div>
+      <div id="dashSR" class="search-results"><div class="sr-empty">输入关键字开始搜索，可同时筛选赛次和状态</div></div>
+    </div>
     <div class="section">
       <div class="sec-head">
         <span class="sec-title">最近赛事</span>
-        <div class="sec-actions"><button class="btn btn-primary btn-sm" onclick="show('events')">查看全部 →</button></div>
+        <div class="sec-actions"><button class="btn btn-primary btn-sm" onclick="show('schedule')">赛程管理 →</button></div>
       </div>
       <div id="dashEvts"><div style="padding:20px;text-align:center;color:var(--t3)">加载中…</div></div>
     </div>`;
@@ -409,7 +470,7 @@ async function renderDashboard(){
   if(!rec||!rec.length){document.getElementById('dashEvts').innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">暂无赛事数据</div>';return;}
   await loadVenueMap();
   document.getElementById('dashEvts').innerHTML=`<div class="table-wrap"><table>
-    <tr><th>赛事</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>状态</th></tr>
+    <tr><th>赛事</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
     ${rec.map(e=>`<tr>
       <td style="color:var(--t1);font-weight:500">${e.is_medal_event?'🥇 ':''}${e.name}</td>
       <td>${VENUES.find(v=>v.id===e.venue_id)?.short_name||'—'}</td>
@@ -417,8 +478,61 @@ async function renderDashboard(){
       <td class="mono">${fmtDT(e.start_time)}</td>
       <td class="mono">${fmtDT(e.end_time)}</td>
       <td>${statusBadge(e.status)}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick='openEvtModal(${JSON.stringify(e).replace(/'/g,"&#39;")})'>✎</button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('确认删除？'))delEvent('${e.id}')">✕</button>
+      </div></td>
     </tr>`).join('')}
   </table></div>`;
+}
+
+let _dashSearchTimer=null;
+async function dashSearch(){
+  clearTimeout(_dashSearchTimer);
+  _dashSearchTimer=setTimeout(async()=>{
+    await loadVenueMap();
+    const q=(document.getElementById('dashSQ')?.value||'').trim();
+    const round=document.getElementById('dashSRound')?.value||'';
+    const status=document.getElementById('dashSStatus')?.value||'';
+    const hasFilter=q||round||status;
+    if(!hasFilter){
+      document.getElementById('dashSR').innerHTML='<div class="sr-empty">输入关键字开始搜索，可同时筛选赛次和状态</div>';
+      document.getElementById('srCnt').textContent='—';return;
+    }
+    document.getElementById('dashSR').innerHTML='<div class="sr-empty">搜索中…</div>';
+    let query=db.from('events').select('*').order('start_time').limit(100);
+    if(q) query=query.or(`name.ilike.%${q}%,round.ilike.%${q}%`);
+    if(round) query=query.eq('round',round);
+    if(status) query=query.eq('status',status);
+    const {data:res,error}=await query;
+    if(error){document.getElementById('dashSR').innerHTML=`<div class="sr-empty">搜索出错：${error.message}</div>`;return;}
+    const found=res||[];
+    document.getElementById('srCnt').textContent=`${found.length} 条`;
+    if(!found.length){document.getElementById('dashSR').innerHTML='<div class="sr-empty">未找到匹配结果</div>';return;}
+    const rows=found.map(e=>`<tr>
+      <td style="color:var(--t1);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.is_medal_event?'🥇 ':''}${e.name}</td>
+      <td>${VENUES.find(v=>v.id===e.venue_id)?.short_name||'—'}</td>
+      <td><span class="badge">${e.round||'—'}</span></td>
+      <td class="mono" style="font-size:10px">${fmtDT(e.start_time)}</td>
+      <td class="mono" style="font-size:10px">${fmtDT(e.end_time)}</td>
+      <td>${statusBadge(e.status)}</td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm" onclick='openEvtModal(${JSON.stringify(e).replace(/'/g,"&#39;")})'>✎ 编辑</button>
+        <button class="btn btn-danger btn-sm" onclick="if(confirm('确认删除 ${e.name.replace(/'/g,'').substring(0,20)}？'))dashDelEvt('${e.id}')">✕</button>
+      </div></td>
+    </tr>`).join('');
+    document.getElementById('dashSR').innerHTML=`<div class="table-wrap"><table>
+      <tr><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th><th>操作</th></tr>
+      ${rows}
+    </table></div>`;
+  },300);
+}
+
+async function dashDelEvt(id){
+  const {error}=await db.from('events').delete().eq('id',id);
+  if(error){alert('删除失败: '+error.message);return;}
+  await logAction('delete','events',id);
+  await dashSearch();
 }
 
 /* ── EVENTS ── */
@@ -473,12 +587,12 @@ function filterEvts(q){
 }
 
 /* ── EVENT MODAL ── */
-async function openEvtModal(ev){
+async function openEvtModal(ev, preVenueId){
   await loadVenueMap();
   const sel=document.getElementById('evtVenue');
   sel.innerHTML=VENUES.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
   if(ev){
-    document.getElementById('evtModalTitle').textContent='编辑赛事';
+    document.getElementById('evtModalTitle').textContent='编辑赛程';
     document.getElementById('evtId').value=ev.id;
     document.getElementById('evtName').value=ev.name||'';
     document.getElementById('evtVenue').value=ev.venue_id||'';
@@ -490,14 +604,17 @@ async function openEvtModal(ev){
     document.getElementById('evtMedal').checked=ev.is_medal_event||false;
     document.getElementById('evtNotes').value=ev.notes||'';
   } else {
-    document.getElementById('evtModalTitle').textContent='添加赛事';
+    document.getElementById('evtModalTitle').textContent='添加赛程';
     document.getElementById('evtId').value='';
     document.getElementById('evtName').value='';
+    document.getElementById('evtRound').value='预赛';
     document.getElementById('evtStart').value='';
     document.getElementById('evtEnd').value='';
     document.getElementById('evtCh').value='';
     document.getElementById('evtNotes').value='';
     document.getElementById('evtMedal').checked=false;
+    document.getElementById('evtStatus').value='scheduled';
+    if(preVenueId) document.getElementById('evtVenue').value=preVenueId;
   }
   document.getElementById('evtModal').classList.add('show');
 }
@@ -520,8 +637,13 @@ async function saveEvent(){
   else {({error:err}=await db.from('events').insert(payload));}
   if(err){alert('保存失败: '+err.message);return;}
   closeModal('evtModal');
-  await renderEvents();
   await logAction(id?'update':'create','events',payload.name);
+  // Refresh active view
+  if(document.querySelector('.sched-layout')){
+    const{data:ev}=await db.from('events').select('*').order('start_time');
+    EVENTS=ev||[];renderScheduleView();
+    document.getElementById('pageSub').textContent=`${VENUES.length} 个项目 · ${EVENTS.length} 条赛程`;
+  } else {await renderEvents();}
 }
 async function delEvent(id){
   if(!confirm('确定删除该赛事？')) return;
@@ -576,10 +698,123 @@ async function saveVenue(){
     location:document.getElementById('venueLocation').value.trim(),
     is_active:document.getElementById('venueActive').checked,
   };
-  const {error}=await db.from('venues').update(payload).eq('id',id);
-  if(error){alert('保存失败: '+error.message);return;}
+  if(!payload.name){alert('请填写项目名称');return;}
+  let err;
+  if(id){({error:err}=await db.from('venues').update(payload).eq('id',id));}
+  else {({error:err}=await db.from('venues').insert(payload));}
+  if(err){alert('保存失败: '+err.message);return;}
+  VENUES=[];// force reload on next call
   closeModal('venueModal');
-  await renderVenues();
+  await logAction(id?'update':'create','venues',payload.name);
+  // Refresh: schedule view or venue list depending on active page
+  if(document.querySelector('.sched-layout')){await loadVenueMap();const{data:ev}=await db.from('events').select('*').order('start_time');EVENTS=ev||[];renderScheduleView();}
+  else await renderVenues();
+}
+
+/* ── SCHEDULE VIEW ── */
+let _schedVenueFilter=null;
+async function renderSchedule(){
+  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
+  document.getElementById('pageActions').innerHTML=`
+    <button class="btn btn-ghost btn-sm" onclick="openVenueModal(null)">＋ 添加项目</button>
+    <button class="btn btn-primary btn-sm" onclick="openEvtModal()">＋ 添加赛程</button>`;
+  await loadVenueMap();
+  const {data:ev}=await db.from('events').select('*').order('start_time');
+  EVENTS=ev||[];
+  document.getElementById('pageSub').textContent=`${VENUES.length} 个项目 · ${EVENTS.length} 条赛程`;
+  _schedVenueFilter=null;
+  renderScheduleView();
+}
+
+function renderScheduleView(){
+  const DAYS='日一二三四五六';
+  const evByVenue={};
+  EVENTS.forEach(e=>{if(!evByVenue[e.venue_id])evByVenue[e.venue_id]=[];evByVenue[e.venue_id].push(e);});
+  // Left panel: venue list
+  const venueListHtml=VENUES.map(v=>{
+    const cnt=(evByVenue[v.id]||[]).length;
+    const isSel=_schedVenueFilter===v.id;
+    return `<div class="sv-venue${isSel?' sv-sel':''}" onclick="filterSchedVenue('${v.id}')" style="--vc:${v.color||'#3b82f6'}">
+      <div class="sv-vbar"></div>
+      <div class="sv-vinfo">
+        <div class="sv-vname">${v.name}</div>
+        <div class="sv-vmeta">${v.short_name||'—'} · ${cnt}场</div>
+      </div>
+      <div class="sv-vact">
+        <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:11px" title="添加赛程" onclick="event.stopPropagation();openEvtModal(null,'${v.id}')">＋</button>
+        <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:11px" title="编辑项目" onclick="event.stopPropagation();openVenueModal(${JSON.stringify(v).replace(/'/g,'&#39;').replace(/"/g,'&quot;')})">✎</button>
+      </div>
+    </div>`;
+  }).join('');
+  // Filter events
+  const filtEvts=_schedVenueFilter?EVENTS.filter(e=>e.venue_id===_schedVenueFilter):EVENTS;
+  // Group by date
+  const groups={};
+  filtEvts.forEach(e=>{const d=new Date(e.start_time);const k=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;if(!groups[k])groups[k]=[];groups[k].push(e);});
+  const evGridHtml=Object.entries(groups).map(([date,evts])=>{
+    const dt=new Date(date+'T00:00:00');
+    const dateLabel=`${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`;
+    const dayLabel=`周${DAYS[dt.getDay()]}`;
+    const cards=evts.map(ev=>{
+      const venue=VENUES.find(v=>v.id===ev.venue_id);
+      const st=new Date(ev.start_time),en=new Date(ev.end_time);
+      const fmt=t=>`${p2(t.getHours())}:${p2(t.getMinutes())}`;
+      const vc=venue?.color||'#3b82f6';
+      const evJ=JSON.stringify(ev).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+      return `<div class="ev-card" style="--vc:${vc}">
+        <div class="ev-card-top">
+          <span class="ev-card-time">${fmt(st)}</span>
+          <span style="color:var(--t3);font-size:10px">→</span>
+          <span class="ev-card-time" style="opacity:.65">${fmt(en)}</span>
+          ${ev.is_medal_event?'<span style="margin-left:auto;font-size:12px">🥇</span>':''}
+        </div>
+        <div class="ev-card-name">${ev.name}</div>
+        <div class="ev-card-bot">
+          <span class="badge" style="font-size:9px;padding:1px 6px">${ev.round||'—'}</span>
+          ${!_schedVenueFilter&&venue?`<span style="font-size:10px;color:${vc};font-weight:600;margin-left:3px;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${venue.short_name||venue.name}</span>`:''}
+          <div class="ev-card-acts">
+            <button class="btn btn-ghost btn-sm" style="padding:2px 7px;font-size:10px" onclick='openEvtModal(JSON.parse(decodeURIComponent("${encodeURIComponent(JSON.stringify(ev))}")))'>✎</button>
+            <button class="btn btn-danger btn-sm" style="padding:2px 7px;font-size:10px" onclick="if(confirm('删除该赛程？'))delSchedEvent('${ev.id}')">✕</button>
+          </div>
+        </div>
+      </div>`;
+    }).join('');
+    return `<div class="ev-group">
+      <div class="ev-group-hdr">
+        <span class="ev-group-date">${dateLabel}</span>
+        <span class="ev-group-day">${dayLabel}</span>
+        <span style="font-size:11px;color:var(--t3)">${evts.length} 场</span>
+      </div>
+      <div class="ev-cards">${cards}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`
+    <div class="sched-layout">
+      <div class="sched-left">
+        <div class="sched-left-hdr">
+          <span style="font-size:11px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em">项目</span>
+          <span style="font-size:10px;color:var(--t3)">${VENUES.length}个</span>
+        </div>
+        ${venueListHtml}
+        ${_schedVenueFilter?`<button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:8px" onclick="filterSchedVenue(null)">× 显示全部</button>`:''}
+      </div>
+      <div class="sched-right">
+        ${filtEvts.length===0?'<div style="padding:60px;text-align:center;color:var(--t3)">暂无赛程，点击左侧项目旁的 ＋ 按钮添加</div>':evGridHtml}
+      </div>
+    </div>`;
+}
+
+function filterSchedVenue(vid){
+  _schedVenueFilter=(vid&&vid!==_schedVenueFilter)?vid:null;
+  renderScheduleView();
+}
+
+async function delSchedEvent(id){
+  const {error}=await db.from('events').delete().eq('id',id);
+  if(error){alert('删除失败: '+error.message);return;}
+  EVENTS=EVENTS.filter(e=>e.id!==id);
+  renderScheduleView();
+  await logAction('delete','events',id);
 }
 
 /* ── IMPORT ── */
