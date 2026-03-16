@@ -1198,56 +1198,164 @@ ${rawText.slice(0,12000)}
   }
 }
 
-function renderAiResult(events, fileName){
+/* ── IMPORT DIFF / PREVIEW ── */
+let _diffResult=null; // {newEvts, modEvts, dupEvts, badEvts}
+
+async function renderAiResult(parsedEvents, fileName){
+  // Load latest DB state for comparison
+  await loadVenueMap();
+  const {data:dbEvts}=await db.from('events').select('*');
+  const dbAll=dbEvts||[];
+
+  const fmtT=ts=>ts?new Date(ts).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'?';
+
+  // Categorise each parsed event
+  const newEvts=[],modEvts=[],dupEvts=[],badEvts=[];
+  parsedEvents.forEach(pe=>{
+    if(!pe.venue_id){badEvts.push({...pe,_reason:'未匹配场馆'});return;}
+    const st=pe.start_time?new Date(pe.start_time).getTime():null;
+    const et=pe.end_time?new Date(pe.end_time).getTime():null;
+    // Find a matching DB event: same name + venue + round (fuzzy time ±60min)
+    const match=dbAll.find(de=>
+      (de.name||'').trim()===(pe.name||'').trim() &&
+      de.venue_id===pe.venue_id &&
+      de.round===pe.round &&
+      st && Math.abs((de.start_time||0)-st)<3600000
+    );
+    if(!match){
+      newEvts.push({...pe,_st:st,_et:et});
+    } else {
+      // Check if anything changed
+      const changed=[];
+      if(st&&Math.abs((match.start_time||0)-st)>60000) changed.push({f:'开始时间',old:fmtT(match.start_time),nw:fmtT(st)});
+      if(et&&Math.abs((match.end_time||0)-et)>60000) changed.push({f:'结束时间',old:fmtT(match.end_time),nw:fmtT(et)});
+      if(pe.round&&match.round!==pe.round) changed.push({f:'赛次',old:match.round,nw:pe.round});
+      if(typeof pe.is_medal_event==='boolean'&&match.is_medal_event!==pe.is_medal_event) changed.push({f:'金牌',old:match.is_medal_event?'是':'否',nw:pe.is_medal_event?'是':'否'});
+      if(changed.length) modEvts.push({...pe,_st:st,_et:et,_dbId:match.id,_changes:changed});
+      else dupEvts.push({...pe,_dbId:match.id});
+    }
+  });
+  _diffResult={newEvts,modEvts,dupEvts,badEvts};
+
+  // Build the diff UI
   const sec=document.getElementById('aiResultSection');
-  const body=document.getElementById('aiResultBody');
-  document.getElementById('aiResultCnt').textContent=`${events.length} 条`;
   sec.style.display='';
-  if(!events.length){body.innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">未解析出任何赛事</div>';return;}
-  body.innerHTML=`<div class="table-wrap"><table style="font-size:11px">
-    <tr><th style="width:32px">#</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>金牌</th></tr>
-    ${events.map((e,i)=>{
-      const v=VENUES.find(x=>x.id===e.venue_id);
-      const st=e.start_time?new Date(e.start_time).toLocaleString('zh',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'?';
-      const et=e.end_time?new Date(e.end_time).toLocaleString('zh',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'?';
-      return `<tr>
-        <td class="mono" style="color:var(--t3)">${i+1}</td>
-        <td style="color:var(--t1);max-width:220px">${e.name||'—'}</td>
-        <td>${v?`<span style="color:var(--acl)">${v.short_name||v.name}</span>`:'<span style="color:#ef4444">未匹配</span>'}</td>
-        <td><span class="badge">${e.round||'—'}</span></td>
-        <td class="mono">${st}</td><td class="mono">${et}</td>
-        <td style="text-align:center">${e.is_medal_event?'🥇':''}</td>
-      </tr>`;
-    }).join('')}
-  </table></div>`;
+  document.getElementById('aiResultCnt').textContent=`${parsedEvents.length} 条 · 🆕${newEvts.length} ✏️${modEvts.length} ✓${dupEvts.length} ⚠️${badEvts.length}`;
+
+  function diffTable(rows,type){
+    if(!rows.length) return `<div style="padding:16px 20px;color:var(--t3);font-size:12px">无</div>`;
+    const hdrCls=type==='new'?'color:#10b981':type==='mod'?'color:#f59e0b':type==='dup'?'color:var(--t3)':'color:#ef4444';
+    return `<div class="table-wrap"><table style="font-size:11px">
+      <tr>
+        ${type!=='dup'?`<th style="width:28px"><input type="checkbox" class="cb diff-sa" data-type="${type}" onclick="diffSelAll(this,'${type}')" checked></th>`:'<th style="width:28px;color:var(--t3)">—</th>'}
+        <th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th>
+        ${type==='mod'?'<th>变更内容</th>':''}
+        ${type==='bad'?'<th>原因</th>':''}
+      </tr>
+      ${rows.map((e,i)=>{
+        const v=VENUES.find(x=>x.id===e.venue_id);
+        const st=fmtT(e._st||e.start_time);
+        const et=fmtT(e._et||e.end_time);
+        const chk=type!=='dup'?`<td><input type="checkbox" class="cb diff-cb diff-${type}" data-idx="${i}" checked></td>`:'<td style="color:var(--t3)">✓</td>';
+        const changes=type==='mod'?`<td style="max-width:180px">${(e._changes||[]).map(c=>`<span style="color:#f59e0b;font-size:10px">${c.f}: <del style="opacity:.5">${c.old}</del>→${c.nw}</span>`).join('<br>')}</td>`:'';
+        const reason=type==='bad'?`<td style="color:#ef4444;font-size:10px">${e._reason||'—'}</td>`:'';
+        return `<tr style="${type==='dup'?'opacity:.45':''}">
+          ${chk}
+          <td style="color:var(--t1)">${e.name||'—'}</td>
+          <td>${v?`<span style="color:var(--acl)">${v.short_name||v.name}</span>`:'<span style="color:#ef4444">?</span>'}</td>
+          <td><span class="badge" style="font-size:9px">${e.round||'—'}</span></td>
+          <td class="mono">${st}</td><td class="mono">${et}</td>
+          ${changes}${reason}
+        </tr>`;
+      }).join('')}
+    </table></div>`;
+  }
+
+  document.getElementById('aiResultBody').innerHTML=`
+    <div style="padding:14px 20px;background:rgba(16,185,129,.06);border-bottom:1px solid var(--b1);display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+      <span style="font-size:12px;color:#10b981;font-weight:700">🆕 新增 ${newEvts.length} 条</span>
+      <span style="font-size:12px;color:#f59e0b;font-weight:700">✏️ 修改 ${modEvts.length} 条</span>
+      <span style="font-size:12px;color:var(--t3)">✓ 重复 ${dupEvts.length} 条（跳过）</span>
+      ${badEvts.length?`<span style="font-size:12px;color:#ef4444;font-weight:700">⚠️ 无法匹配 ${badEvts.length} 条</span>`:''}
+      <button class="btn btn-primary" style="margin-left:auto" onclick="confirmAiImport()">✓ 确认写入数据库</button>
+      <button class="btn btn-ghost" onclick="document.getElementById('aiResultSection').style.display='none';_diffResult=null">取消</button>
+    </div>
+    ${newEvts.length?`<div style="padding:10px 20px 4px"><span style="font-size:11px;font-weight:700;color:#10b981">🆕 新增（将插入）</span></div>${diffTable(newEvts,'new')}`:''}
+    ${modEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#f59e0b">✏️ 变更（将更新）</span></div>${diffTable(modEvts,'mod')}`:''}
+    ${dupEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:var(--t3)">✓ 重复（自动跳过）</span></div>${diffTable(dupEvts,'dup')}`:''}
+    ${badEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#ef4444">⚠️ 无法导入（场馆未匹配）</span></div>${diffTable(badEvts,'bad')}`:''}`;
+}
+
+function diffSelAll(cb,type){
+  document.querySelectorAll(`.diff-${type}`).forEach(c=>c.checked=cb.checked);
 }
 
 async function confirmAiImport(){
-  if(!_aiParsedEvents.length){alert('没有可导入的数据');return;}
-  const btn=event.target;btn.disabled=true;btn.textContent='导入中…';
-  let ok=0,fail=0;
-  const toInsert=_aiParsedEvents.map(e=>({
-    id: crypto.randomUUID(),
-    venue_id: e.venue_id||null,
-    name: e.name||'未命名',
-    round: e.round||'',
-    is_medal_event: !!e.is_medal_event,
-    start_time: e.start_time?new Date(e.start_time).getTime():null,
-    end_time: e.end_time?new Date(e.end_time).getTime():null,
-    status:'scheduled',participants:[],is_imported:true,import_source:'ai_import'
-  })).filter(e=>e.start_time);
-  // Batch insert
-  for(let i=0;i<toInsert.length;i+=50){
-    const {error}=await db.from('events').insert(toInsert.slice(i,i+50));
-    if(error) fail+=Math.min(50,toInsert.length-i);
-    else ok+=Math.min(50,toInsert.length-i);
+  if(!_diffResult){alert('没有可导入的数据');return;}
+  const {newEvts,modEvts}=_diffResult;
+
+  // Collect selected new events
+  const selNewIdxs=new Set([...document.querySelectorAll('.diff-new:checked')].map(c=>+c.dataset.idx));
+  const selModIdxs=new Set([...document.querySelectorAll('.diff-mod:checked')].map(c=>+c.dataset.idx));
+  const toInsert=newEvts.filter((_,i)=>selNewIdxs.has(i));
+  const toUpdate=modEvts.filter((_,i)=>selModIdxs.has(i));
+
+  if(!toInsert.length&&!toUpdate.length){alert('未勾选任何变更项，操作取消');return;}
+
+  const btn=document.querySelector('#aiResultBody .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='写入中…';}
+
+  let insOk=0,insFail=0,updOk=0,updFail=0;
+  const logLines=[];
+
+  // Insert new events
+  if(toInsert.length){
+    const rows=toInsert.map(e=>({
+      id:crypto.randomUUID(),venue_id:e.venue_id||null,name:e.name||'未命名',
+      round:e.round||'',is_medal_event:!!e.is_medal_event,
+      start_time:e._st||null,end_time:e._et||null,
+      status:'scheduled',is_imported:true,import_source:'ai_import'
+    })).filter(e=>e.start_time);
+    for(let i=0;i<rows.length;i+=50){
+      const {error}=await db.from('events').insert(rows.slice(i,i+50));
+      const n=Math.min(50,rows.length-i);
+      if(error){insFail+=n;logLines.push(`[新增失败] ${error.message}`);}
+      else{insOk+=n;rows.slice(i,i+n).forEach(r=>logLines.push(`[新增] ${r.name} | ${r.round} | ${new Date(r.start_time).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false})}`))}
+    }
   }
-  await logAction('import','events',`AI导入完成：成功 ${ok} 条，失败 ${fail} 条`);
-  btn.disabled=false;btn.textContent='✓ 确认导入数据库';
-  alert(`导入完成：成功 ${ok} 条${fail?`，失败 ${fail} 条`:''}。`);
-  document.getElementById('aiResultSection').style.display='none';
-  _aiParsedEvents=[];
-  loadImportHist();
+
+  // Update modified events
+  for(const e of toUpdate){
+    const payload={};
+    if(e._st) payload.start_time=e._st;
+    if(e._et) payload.end_time=e._et;
+    if(e.round) payload.round=e.round;
+    if(typeof e.is_medal_event==='boolean') payload.is_medal_event=e.is_medal_event;
+    const {error}=await db.from('events').update(payload).eq('id',e._dbId);
+    if(error){updFail++;logLines.push(`[更新失败] ${e.name}: ${error.message}`);}
+    else{updOk++;const changes=(e._changes||[]).map(c=>`${c.f}:${c.old}→${c.nw}`).join(', ');logLines.push(`[更新] ${e.name} | ${changes}`);}
+  }
+
+  // Write formal audit log
+  const summary=`AI导入 — 新增${insOk}条，更新${updOk}条${insFail+updFail?`，失败${insFail+updFail}条`:''}`;
+  const detail=logLines.join('\n');
+  await logAction('import','events',summary+'\n'+detail);
+
+  if(btn){btn.disabled=false;btn.textContent='✓ 确认写入数据库';}
+  // Show result in place
+  document.getElementById('aiResultBody').innerHTML=`
+    <div style="padding:24px 20px">
+      <div style="font-size:14px;font-weight:700;color:#10b981;margin-bottom:12px">✓ 导入完成</div>
+      ${insOk?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">🆕 新增：${insOk} 条成功${insFail?`，${insFail} 条失败`:''}</div>`:''}
+      ${updOk?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">✏️ 更新：${updOk} 条成功${updFail?`，${updFail} 条失败`:''}</div>`:''}
+      <div style="margin-top:12px;padding:10px 14px;background:var(--gl);border-radius:6px;font-size:10px;font-family:var(--mono);color:var(--t3);max-height:180px;overflow-y:auto;line-height:1.8;white-space:pre">${logLines.join('\n')}</div>
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="show('schedule')">查看赛程 →</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('aiResultSection').style.display='none';_diffResult=null">关闭</button>
+        <button class="btn btn-ghost btn-sm" onclick="show('audit')">查看日志 →</button>
+      </div>
+    </div>`;
+  _diffResult=null;
 }
 async function loadImportHist(){
   const {data}=await db.from('import_history').select('*').order('created_at',{ascending:false}).limit(10);
