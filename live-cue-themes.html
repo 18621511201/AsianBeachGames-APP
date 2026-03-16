@@ -1,0 +1,1571 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="cyberpunk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5">
+<title>亚沙会 · 智慧转播赛程</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700&family=Inter:wght@300;400;500;600;700&family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+/* ══ TOKENS ══════════════════════════════════════════════════ */
+[data-theme="cyberpunk"]{--bg-base:#020008;--bg-surface:#070010;--bg-elevated:#110022;--bg-glass:rgba(255,0,200,.05);--bg-gh:rgba(255,0,200,.10);--accent:#ff00cc;--al:#ff66e0;--ag:rgba(255,0,204,.45);--live:#ff003c;--livebg:rgba(255,0,60,.10);--livebdr:rgba(255,0,60,.35);--up:#00ffcc;--upbg:rgba(0,255,204,.10);--upbdr:rgba(0,255,204,.35);--t1:#f0ddff;--t2:#9955bb;--t3:#553366;--b1:rgba(255,0,204,.08);--b2:rgba(255,0,204,.18);--b3:rgba(255,0,204,.55);--nc:#ff003c;--ng:rgba(255,0,60,.65);--rsm:2px;--rmd:3px;--rlg:4px;--rp:2px;--cw:700;--cls:.06em;--cf:var(--mono);--bf:var(--mono)}
+[data-theme="beach"]{--bg-base:#041726;--bg-surface:#072240;--bg-elevated:#0c3358;--bg-glass:rgba(255,180,60,.04);--bg-gh:rgba(255,180,60,.08);--accent:#06b6d4;--al:#22d3ee;--ag:rgba(6,182,212,.35);--live:#f97316;--livebg:rgba(249,115,22,.12);--livebdr:rgba(249,115,22,.35);--up:#fbbf24;--upbg:rgba(251,191,36,.12);--upbdr:rgba(251,191,36,.35);--t1:#e0f7ff;--t2:#7ecfe0;--t3:#3a7a90;--b1:rgba(6,182,212,.08);--b2:rgba(6,182,212,.16);--b3:rgba(6,182,212,.50);--nc:#f97316;--ng:rgba(249,115,22,.60);--rsm:12px;--rmd:18px;--rlg:26px;--rp:999px;--cw:600;--cls:.03em;--cf:var(--sans);--bf:var(--sans)}
+[data-theme="fashion"]{--bg-base:#090809;--bg-surface:#0f0e10;--bg-elevated:#1a181c;--bg-glass:rgba(212,175,55,.03);--bg-gh:rgba(212,175,55,.07);--accent:#c9a84c;--al:#e2c068;--ag:rgba(201,168,76,.30);--live:#e05555;--livebg:rgba(224,85,85,.10);--livebdr:rgba(224,85,85,.30);--up:#c9a84c;--upbg:rgba(201,168,76,.10);--upbdr:rgba(201,168,76,.30);--t1:#f5f4f0;--t2:#7a756e;--t3:#3a3630;--b1:rgba(201,168,76,.07);--b2:rgba(201,168,76,.13);--b3:rgba(201,168,76,.40);--nc:#c9a84c;--ng:rgba(201,168,76,.50);--rsm:0px;--rmd:0px;--rlg:0px;--rp:0px;--cw:300;--cls:.10em;--cf:var(--mono);--bf:var(--serif)}
+[data-theme="chinese"]{--bg-base:#110004;--bg-surface:#1c0007;--bg-elevated:#2e000c;--bg-glass:rgba(255,215,0,.04);--bg-gh:rgba(255,215,0,.08);--accent:#ffd700;--al:#ffe566;--ag:rgba(255,215,0,.40);--live:#ff1a2e;--livebg:rgba(255,26,46,.12);--livebdr:rgba(255,26,46,.40);--up:#ffd700;--upbg:rgba(255,215,0,.12);--upbdr:rgba(255,215,0,.40);--t1:#fff8e8;--t2:#cc8833;--t3:#7a4418;--b1:rgba(255,215,0,.08);--b2:rgba(255,215,0,.16);--b3:rgba(255,215,0,.50);--nc:#ff1a2e;--ng:rgba(255,26,46,.65);--rsm:2px;--rmd:4px;--rlg:6px;--rp:4px;--cw:700;--cls:.04em;--cf:var(--mono);--bf:var(--serif)}
+[data-theme="fresh"]{--bg-base:#f0f5fb;--bg-surface:#ffffff;--bg-elevated:#e8f1fc;--bg-glass:rgba(37,99,235,.04);--bg-gh:rgba(37,99,235,.08);--accent:#2563eb;--al:#1d4ed8;--ag:rgba(37,99,235,.20);--live:#dc2626;--livebg:rgba(220,38,38,.08);--livebdr:rgba(220,38,38,.28);--up:#d97706;--upbg:rgba(217,119,6,.08);--upbdr:rgba(217,119,6,.28);--t1:#0f172a;--t2:#334155;--t3:#64748b;--b1:rgba(0,0,0,.07);--b2:rgba(0,0,0,.11);--b3:rgba(37,99,235,.45);--nc:#dc2626;--ng:rgba(220,38,38,.45);--rsm:8px;--rmd:14px;--rlg:20px;--rp:999px;--cw:500;--cls:.01em;--cf:var(--sans);--bf:var(--sans)}
+:root{--mono:'JetBrains Mono',monospace;--sans:'Inter',-apple-system,sans-serif;--serif:'Noto Serif SC','STSong',serif;--row:80px;--pw:175px;--axh:44px;--barh:40px;--tbh:44px}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--t1);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+
+/* ══ SHELL ═══════════════════════════════════════════════════ */
+#app{display:flex;flex-direction:column;height:100vh;height:100dvh}
+
+/* ══ THEME BAR ═══════════════════════════════════════════════ */
+.tbar{flex-shrink:0;height:var(--tbh);background:rgba(0,0,0,.85);backdrop-filter:blur(12px);border-bottom:1px solid rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;gap:6px;padding:0 20px;z-index:100}
+.tbar-lbl{font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.3);margin-right:8px;flex-shrink:0}
+.tbtn{display:flex;align-items:center;gap:6px;padding:6px 14px;border-radius:4px;font-size:11px;font-weight:600;cursor:pointer;transition:all .22s;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:rgba(255,255,255,.45);font-family:var(--sans);white-space:nowrap}
+.tbtn:hover{color:rgba(255,255,255,.8);background:rgba(255,255,255,.08)}
+.tdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+[data-theme="cyberpunk"] .tbtn[data-t="cyberpunk"]{border-color:#ff00cc55;background:rgba(255,0,204,.15);color:#ff66e0}
+[data-theme="beach"]     .tbtn[data-t="beach"]    {border-color:#06b6d455;background:rgba(6,182,212,.15);color:#22d3ee}
+[data-theme="fashion"]   .tbtn[data-t="fashion"]  {border-color:#c9a84c55;background:rgba(201,168,76,.15);color:#e2c068}
+[data-theme="chinese"]   .tbtn[data-t="chinese"]  {border-color:#ffd70055;background:rgba(255,215,0,.15);color:#ffe566}
+
+/* DB status indicator */
+.db-status{display:flex;align-items:center;gap:5px;margin-left:auto;font-size:10px;font-weight:600;color:rgba(255,255,255,.3);flex-shrink:0}
+.db-dot{width:7px;height:7px;border-radius:50%;background:#334155}
+.db-dot.connecting{background:#f59e0b;animation:dbPulse 1s ease infinite}
+.db-dot.live{background:#10b981;box-shadow:0 0 6px #10b981}
+.db-dot.error{background:#ef4444}
+@keyframes dbPulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ══ HEADER ═══════════════════════════════════════════════════ */
+.header{flex-shrink:0;border-bottom:1px solid var(--b1);position:relative;overflow:hidden}
+.hbg{position:absolute;inset:0;pointer-events:none;z-index:0}
+.hi{display:flex;align-items:center;justify-content:space-between;padding:14px 24px;gap:20px;position:relative;z-index:1}
+
+[data-theme="cyberpunk"] .header{background:#07000f;box-shadow:0 1px 0 #ff00cc33}
+[data-theme="cyberpunk"] .hbg{background:repeating-linear-gradient(0deg,transparent,transparent 3px,rgba(255,0,200,.018) 3px,rgba(255,0,200,.018) 4px),radial-gradient(ellipse 70% 100% at 50% -10%,rgba(255,0,204,.10) 0%,transparent 70%)}
+[data-theme="cyberpunk"] .header::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#ff00cc 30%,#00ffcc 70%,transparent);box-shadow:0 0 20px #ff00cc88}
+[data-theme="beach"] .header{background:linear-gradient(160deg,#041726 0%,#072845 50%,#0e3d5e 100%)}
+[data-theme="beach"] .hbg{background:radial-gradient(ellipse 50% 120% at 80% 50%,rgba(249,115,22,.14) 0%,transparent 65%),radial-gradient(ellipse 40% 80% at 20% 20%,rgba(6,182,212,.10) 0%,transparent 60%)}
+[data-theme="beach"] .header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#06b6d4,#f97316,#fbbf24,transparent);opacity:.5}
+[data-theme="fashion"] .header{background:#090809}
+[data-theme="fashion"] .header::before{content:'';position:absolute;top:0;left:26px;right:26px;height:1px;background:linear-gradient(90deg,transparent,#c9a84cbb,transparent)}
+[data-theme="fashion"] .header::after{content:'';position:absolute;bottom:0;left:26px;right:26px;height:1px;background:linear-gradient(90deg,transparent,#c9a84cbb,transparent)}
+[data-theme="chinese"] .header{background:linear-gradient(180deg,#180006 0%,#220009 100%)}
+[data-theme="chinese"] .hbg{background:radial-gradient(ellipse 80% 100% at 50% -10%,rgba(220,20,60,.22) 0%,transparent 65%),radial-gradient(ellipse 30% 60% at 5% 50%,rgba(255,215,0,.06) 0%,transparent 60%),radial-gradient(ellipse 30% 60% at 95% 50%,rgba(255,215,0,.06) 0%,transparent 60%)}
+[data-theme="chinese"] .header::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,transparent,#ff1a2e,#ffd700,#ff1a2e,transparent);box-shadow:0 0 18px rgba(255,26,46,.6)}
+[data-theme="chinese"] .hi::before,[data-theme="chinese"] .hi::after{content:'❧';font-size:22px;color:#ffd70055;position:absolute;top:50%;transform:translateY(-50%);pointer-events:none}
+[data-theme="chinese"] .hi::before{left:8px}
+[data-theme="chinese"] .hi::after{right:8px}
+
+/* brand */
+.brand{display:flex;align-items:center;gap:12px;flex-shrink:0;min-width:0}
+.brand-logo{width:44px;height:44px;border-radius:var(--rmd);display:flex;align-items:center;justify-content:center;flex-shrink:0;border:1px solid var(--b2);overflow:hidden}
+[data-theme="cyberpunk"] .brand-logo{background:linear-gradient(135deg,#1a003a,#2a005a);box-shadow:0 0 12px #ff00cc44}
+[data-theme="beach"]     .brand-logo{background:linear-gradient(135deg,#041e3a,#07345a)}
+[data-theme="fashion"]   .brand-logo{background:#111;border-color:#c9a84c33}
+[data-theme="chinese"]   .brand-logo{background:linear-gradient(135deg,#2e000c,#480010);border-color:#ffd70033;box-shadow:0 0 10px rgba(255,26,46,.2)}
+.brand-logo img{width:32px;height:32px;object-fit:contain}
+.brand-text{display:flex;flex-direction:column;gap:2px;min-width:0}
+.bn{font-size:14px;font-weight:600;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--bf)}
+[data-theme="cyberpunk"] .bn{font-size:11px;letter-spacing:.06em;text-transform:uppercase;text-shadow:0 0 10px var(--accent)}
+[data-theme="fashion"]   .bn{font-weight:400;letter-spacing:.04em}
+[data-theme="chinese"]   .bn{letter-spacing:.12em;font-weight:700}
+.bs{font-size:9px;font-weight:500;color:var(--t3);letter-spacing:.10em;text-transform:uppercase}
+
+/* clock */
+.ck{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px}
+.ck-d{font-family:var(--cf);font-size:42px;font-weight:var(--cw);letter-spacing:var(--cls);line-height:1;color:var(--t1);white-space:nowrap}
+.ck-d .sep{color:var(--t3)}
+.vsport{font-size:14px;margin-right:4px;flex-shrink:0}
+[data-theme="cyberpunk"] .ck-d{text-shadow:2px 0 0 #ff00cc44,-2px 0 0 #00ffcc44,0 0 30px rgba(255,0,204,.3)}
+[data-theme="fashion"]   .ck-d{font-size:46px;font-weight:200;letter-spacing:.12em;text-shadow:0 0 40px rgba(201,168,76,.15)}
+[data-theme="chinese"]   .ck-d{text-shadow:0 0 20px rgba(255,215,0,.2),0 0 40px rgba(255,26,46,.15)}
+.ck-m{display:flex;align-items:center;gap:10px}
+.ck-date{font-size:12px;color:var(--t2)}
+[data-theme="fashion"] .ck-date{font-family:var(--serif);font-style:italic}
+[data-theme="chinese"] .ck-date{font-family:var(--serif)}
+.sync{display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:var(--rp);font-size:10px;font-weight:600;border:1px solid}
+[data-theme="cyberpunk"] .sync{background:rgba(0,255,204,.06);border-color:rgba(0,255,204,.2);color:#00ffcc}
+[data-theme="beach"]     .sync{background:rgba(6,182,212,.08);border-color:rgba(6,182,212,.2);color:#22d3ee}
+[data-theme="fashion"]   .sync{background:rgba(201,168,76,.06);border-color:rgba(201,168,76,.2);color:#c9a84c;letter-spacing:.06em}
+[data-theme="chinese"]   .sync{background:rgba(255,215,0,.06);border-color:rgba(255,215,0,.2);color:#ffd700}
+.sdot{width:6px;height:6px;border-radius:50%;animation:sp 2.5s ease infinite}
+[data-theme="cyberpunk"] .sdot{background:#00ffcc;box-shadow:0 0 6px #00ffcc}
+[data-theme="beach"]     .sdot{background:#06b6d4}
+[data-theme="fashion"]   .sdot{background:#c9a84c}
+[data-theme="chinese"]   .sdot{background:#ffd700;box-shadow:0 0 5px #ffd700}
+@keyframes sp{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.4;transform:scale(.7)}}
+
+/* header actions */
+.ha{display:flex;align-items:center;gap:7px;flex-shrink:0}
+.hbdg{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:var(--rp);font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:all .2s;border:1px solid}
+.hbdg.live{background:var(--livebg);border-color:var(--livebdr);color:var(--live)}
+.hbdg.up{background:var(--upbg);border-color:var(--upbdr);color:var(--up)}
+.hbdg-dot{width:7px;height:7px;border-radius:50%}
+.hbdg.live .hbdg-dot{background:var(--live);animation:lp 1.6s ease infinite;box-shadow:0 0 5px var(--live)}
+.hbdg.up .hbdg-dot{background:var(--up)}
+@keyframes lp{0%,100%{transform:scale(1)}50%{transform:scale(1.6);opacity:.6}}
+.bico{display:flex;align-items:center;gap:6px;padding:6px 12px;background:var(--bg-glass);border:1px solid var(--b2);border-radius:var(--rmd);color:var(--t2);font-size:11px;font-weight:500;cursor:pointer;transition:all .18s;white-space:nowrap;font-family:var(--sans)}
+.bico:hover{background:var(--bg-gh);border-color:var(--b3);color:var(--t1)}
+[data-theme="cyberpunk"] .bico{letter-spacing:.04em;text-transform:uppercase;font-size:10px}
+
+/* ══ TOOLBAR ══════════════════════════════════════════════════ */
+.tb{flex-shrink:0;height:50px;background:var(--bg-surface);border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 22px;gap:4px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+.tb::-webkit-scrollbar{display:none}
+[data-theme="fashion"] .tb{background:var(--bg-base)}
+.tbl{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.12em;flex-shrink:0;padding:0 4px}
+.tdiv{width:1px;height:20px;background:var(--b1);margin:0 10px;flex-shrink:0}
+.brng{padding:4px 10px;border-radius:var(--rsm);font-size:11px;font-weight:500;color:var(--t2);background:transparent;border:1px solid transparent;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:var(--sans)}
+.brng:hover{background:var(--bg-glass);color:var(--t1)}
+.brng.active{background:var(--bg-gh);border-color:var(--b3);color:var(--al)}
+[data-theme="cyberpunk"] .brng.active{text-shadow:0 0 8px var(--accent)}
+.date-nav{display:flex;align-items:center;gap:2px;background:var(--bg-glass);border:1px solid var(--b2);border-radius:var(--rsm);flex-shrink:0;position:relative}
+.date-nav button{padding:0 8px;height:28px;background:transparent;border:none;color:var(--t2);cursor:pointer;font-size:14px;transition:all .15s;display:flex;align-items:center}
+.date-nav button:hover{background:var(--bg-gh);color:var(--t1)}
+.date-val{padding:0 6px;font-size:11px;font-weight:600;font-family:var(--mono);color:var(--t1);border-left:1px solid var(--b1);border-right:1px solid var(--b1);height:28px;display:flex;align-items:center;white-space:nowrap;cursor:pointer;position:relative}
+.date-val:hover{color:var(--al)}
+
+/* ══ CALENDAR POPUP ═══════════════════════════════════════ */
+.cal-popup{position:fixed;z-index:9999;background:var(--bg-elevated);border:1px solid var(--b2);border-radius:var(--rmd);padding:10px;box-shadow:0 12px 40px rgba(0,0,0,.7);min-width:240px;display:none;backdrop-filter:blur(12px)}
+.cal-popup.show{display:block}
+.cal-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-hdr button{background:none;border:none;color:var(--t2);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:var(--rsm)}
+.cal-hdr button:hover{color:var(--t1);background:var(--bg-glass)}
+.cal-hdr span{font-size:12px;font-weight:600;color:var(--t1);font-family:var(--mono)}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;text-align:center}
+.cal-dow{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;padding:4px 0}
+.cal-day{font-size:11px;font-family:var(--mono);padding:5px 2px;border-radius:var(--rsm);cursor:pointer;color:var(--t2);border:1px solid transparent;transition:all .15s}
+.cal-day:hover{background:var(--bg-glass);color:var(--t1)}
+.cal-day.today{border-color:var(--accent);color:var(--al)}
+.cal-day.selected{background:var(--bg-gh);border-color:var(--b3);color:var(--t1);font-weight:700}
+.cal-day.has-events{color:var(--t1);font-weight:600;position:relative}
+.cal-day.has-events::after{content:'';position:absolute;bottom:2px;left:50%;transform:translateX(-50%);width:4px;height:4px;border-radius:50%;background:var(--accent)}
+.cal-day.other-month{opacity:.3}
+.cal-day.empty{cursor:default}
+.zm-g{display:flex;align-items:center;gap:3px}
+.bzm{width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:var(--bg-glass);border:1px solid var(--b2);border-radius:var(--rsm);color:var(--t2);font-size:15px;cursor:pointer;transition:all .15s}
+.bzm:hover{background:var(--bg-gh);border-color:var(--b3);color:var(--t1)}
+.zmv{font-size:10px;font-weight:600;font-family:var(--mono);color:var(--t2);min-width:64px;text-align:center}
+.bnow{display:flex;align-items:center;gap:5px;padding:4px 11px;background:var(--bg-glass);border:1px solid var(--b2);border-radius:var(--rsm);color:var(--al);font-size:11px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--sans);white-space:nowrap}
+.bnow:hover{background:var(--bg-gh);border-color:var(--b3);box-shadow:0 0 12px var(--ag)}
+.fseg{display:flex;align-items:center;background:var(--bg-glass);border:1px solid var(--b2);border-radius:var(--rmd);padding:3px;gap:2px}
+.bseg{padding:3px 10px;border-radius:var(--rsm);font-size:10px;font-weight:600;color:var(--t2);background:transparent;border:none;cursor:pointer;transition:all .15s;white-space:nowrap;font-family:var(--sans)}
+.bseg:hover{color:var(--t1)}
+.bseg.active{background:var(--bg-elevated);color:var(--t1);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.bseg.active[data-f="live"]{color:var(--live)}
+.bseg.active[data-f="upcoming"]{color:var(--up)}
+
+/* ══ ROUND BAR ════════════════════════════════════════════════ */
+.rb{flex-shrink:0;height:40px;background:var(--bg-surface);border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 22px;gap:7px;overflow-x:auto;scrollbar-width:none}
+.rb::-webkit-scrollbar{display:none}
+[data-theme="fashion"] .rb{background:var(--bg-base);border-bottom:1px solid var(--b1)}
+.rbl{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.12em;flex-shrink:0}
+.brd{padding:3px 13px;border-radius:var(--rp);font-size:10px;font-weight:600;color:var(--t3);background:transparent;border:1px solid var(--b1);cursor:pointer;transition:all .15s;white-space:nowrap;font-family:var(--sans)}
+.brd:hover{color:var(--t2);border-color:var(--b2)}
+.brd.active{color:var(--t1);border-color:var(--b3);background:var(--bg-gh)}
+[data-theme="cyberpunk"] .brd.active{box-shadow:0 0 8px var(--ag);text-shadow:0 0 6px var(--accent)}
+[data-theme="chinese"]   .brd.active{box-shadow:0 0 8px var(--ag)}
+
+/* ══ TIMELINE ═════════════════════════════════════════════════ */
+.tl{flex:1;display:flex;min-height:0;overflow:hidden}
+.vp{width:var(--pw);flex-shrink:0;background:var(--bg-surface);border-right:1px solid var(--b1);display:flex;flex-direction:column;z-index:5}
+[data-theme="cyberpunk"] .vp{border-right-color:#ff00cc22}
+[data-theme="chinese"]   .vp{background:repeating-linear-gradient(45deg,var(--bg-surface),var(--bg-surface) 20px,rgba(255,215,0,.008) 20px,rgba(255,215,0,.008) 40px)}
+.vph{height:var(--axh);display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--b1);flex-shrink:0}
+.vphl{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.12em}
+.vphc{margin-left:auto;font-size:10px;font-family:var(--mono);color:var(--t3)}
+.vlist{flex:1;overflow-y:hidden}
+.vrow{height:var(--row);display:flex;align-items:center;padding:0 14px;border-bottom:1px solid var(--b1);cursor:pointer;transition:background .15s;position:relative}
+.vrow::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:26px;border-radius:0 2px 2px 0;background:var(--vc);opacity:0;transition:opacity .15s}
+.vrow:hover{background:var(--bg-glass)}
+.vrow:hover::before{opacity:1}
+.vi{display:flex;flex-direction:column;gap:3px}
+.vn{font-size:12px;font-weight:600;color:var(--t1)}
+.vz{font-size:9px;color:var(--t3)}
+[data-theme="chinese"] .vn{font-family:var(--serif)}
+[data-theme="fashion"] .vn{font-family:var(--serif);font-weight:400;font-size:13px}
+.gs{flex:1;overflow:auto;position:relative;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.06) transparent}
+.gs::-webkit-scrollbar{height:4px;width:4px}
+.gs::-webkit-scrollbar-track{background:transparent}
+.gs::-webkit-scrollbar-thumb{background:rgba(255,255,255,.06);border-radius:2px}
+.gi{position:relative;min-width:100%}
+[data-theme="cyberpunk"] .gs{background-image:linear-gradient(rgba(255,0,200,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,0,200,.02) 1px,transparent 1px);background-size:60px 60px}
+.tax{height:var(--axh);position:sticky;top:0;background:var(--bg-surface);border-bottom:1px solid var(--b1);z-index:10}
+.tm{position:absolute;display:flex;flex-direction:column;align-items:center;transform:translateX(-50%);bottom:7px}
+.tml{font-size:9px;font-family:var(--mono);font-weight:500;color:var(--t3);white-space:nowrap}
+.tm.daymark .tml{color:var(--al);font-weight:700;font-size:10px}
+.tmk{width:1px;height:4px;background:var(--b1);margin-top:3px}
+.grs{position:relative}
+.gr{height:var(--row);border-bottom:1px solid var(--b1);position:relative}
+.gr:nth-child(even){background:rgba(255,255,255,.012)}
+[data-theme="cyberpunk"] .gr{border-bottom-color:#ff00cc0a}
+[data-theme="chinese"]   .gr{border-bottom-color:rgba(255,215,0,.05)}
+.gl{position:absolute;top:0;bottom:0;width:1px;background:var(--b1);pointer-events:none}
+.nl{position:absolute;top:0;width:2px;background:var(--nc);z-index:20;pointer-events:none;transform:translateX(-50%);box-shadow:0 0 10px var(--ng),0 0 24px var(--ng)}
+.nlbl{position:absolute;bottom:calc(100% + 3px);left:50%;transform:translateX(-50%);font-family:var(--mono);font-size:8px;font-weight:700;color:var(--nc);letter-spacing:.12em;background:var(--bg-surface);padding:2px 5px;border-radius:2px;border:1px solid var(--nc);white-space:nowrap;opacity:.7;box-shadow:0 0 8px var(--ng)}
+.ndm{position:absolute;top:-5px;left:50%;transform:translateX(-50%) rotate(45deg);width:8px;height:8px;background:var(--nc);box-shadow:0 0 8px var(--ng)}
+
+/* ══ EVENTS ═══════════════════════════════════════════════════ */
+.ev{position:absolute;top:7px;bottom:7px;border-radius:var(--rsm);overflow:hidden;cursor:pointer;min-width:28px;transition:transform .15s,box-shadow .15s;animation:fup .2s ease both}
+.ev:hover{transform:translateY(-1px);z-index:5}
+.ev.finished{opacity:.5;filter:saturate(.4)}
+.ev.upcoming{border-style:dashed;border-width:1.5px}
+.ev.live{animation:fup .2s ease both,evlive 2s ease-in-out 0.2s infinite}
+@keyframes evlive{0%,100%{box-shadow:0 0 8px var(--ec,#fff)}50%{box-shadow:0 0 20px var(--ec,#fff)}}
+@keyframes fup{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+[data-theme="cyberpunk"] .ev{border-radius:0}
+[data-theme="fashion"]   .ev{border-radius:0}
+.evi{position:absolute;inset:0;padding:4px 7px;display:flex;flex-direction:column;justify-content:center;gap:1px}
+.ev-medal{font-size:10px;line-height:1}
+.ev-name{font-size:11px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.ev-rnd{font-size:8px;font-weight:700;color:rgba(255,255,255,.7);text-transform:uppercase;letter-spacing:.05em}
+.ev-t{font-size:8px;font-family:var(--mono);color:rgba(255,255,255,.55)}
+[data-theme="chinese"] .ev-name{font-family:var(--serif);font-size:10px}
+[data-theme="fashion"] .ev-name{font-family:var(--serif);font-weight:600}
+
+/* ══ STATUS BAR ══════════════════════════════════════════════ */
+.sbar{flex-shrink:0;height:var(--barh);background:var(--bg-surface);border-top:1px solid var(--b1);display:flex;align-items:center;padding:0 22px;gap:0;overflow-x:auto;scrollbar-width:none}
+.sbar::-webkit-scrollbar{display:none}
+.si{display:flex;align-items:center;gap:6px;padding:0 14px;font-size:11px;color:var(--t2);border-right:1px solid var(--b1);white-space:nowrap;flex-shrink:0}
+.si:first-child{padding-left:0}
+.sidot{width:7px;height:7px;border-radius:50%}
+.sinum{font-weight:700;font-family:var(--mono);color:var(--t1)}
+.sleg{display:flex;align-items:center;gap:14px;margin-left:auto;padding-left:14px}
+.leg{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--t3)}
+.legpill{width:16px;height:6px;border-radius:2px}
+.legpill.dash{background:none;border:1.5px dashed;border-radius:0}
+
+/* ══ LOADING & ERROR ═════════════════════════════════════════ */
+.overlay{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:50;pointer-events:none;opacity:0;transition:opacity .3s}
+.overlay.show{opacity:1;pointer-events:all}
+.spin{width:32px;height:32px;border:2px solid var(--b2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.overlay-txt{font-size:12px;color:var(--t2);font-weight:500}
+.err-banner{position:absolute;bottom:50px;left:50%;transform:translateX(-50%);background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.35);border-radius:var(--rmd);padding:8px 16px;font-size:11px;color:#f87171;z-index:60;white-space:nowrap;display:none}
+.empty-state{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none;z-index:15}
+.es-icon{font-size:40px;opacity:.2;margin-bottom:4px}
+.es-txt{font-size:13px;font-weight:500;color:var(--t2)}
+.es-sub{font-size:10px;color:var(--t3);opacity:.7}
+
+/* ══ TOOLTIP ══════════════════════════════════════════════════ */
+.tt{position:fixed;z-index:999;background:var(--bg-elevated);border:1px solid var(--b2);border-radius:var(--rmd);padding:12px 15px;box-shadow:0 12px 40px rgba(0,0,0,.7);pointer-events:none;opacity:0;transform:translateY(6px);transition:opacity .15s,transform .15s;max-width:240px;backdrop-filter:blur(12px)}
+.tt.show{opacity:1;transform:translateY(0)}
+[data-theme="cyberpunk"] .tt{border-color:#ff00cc44;box-shadow:0 0 20px #ff00cc22,0 12px 40px rgba(0,0,0,.8)}
+[data-theme="chinese"]   .tt{border-color:#ffd70033}
+.tt-title{font-size:12px;font-weight:600;color:var(--t1);margin-bottom:7px}
+.tt-row{display:flex;justify-content:space-between;gap:14px;font-size:10px;color:var(--t2);margin-bottom:2px}
+.tt-val{font-family:var(--mono);color:var(--t1);font-weight:500}
+
+/* ══ FRESH THEME OVERRIDES ══════════════════════════════════ */
+[data-theme="fresh"] .header{background:linear-gradient(160deg,#e8f4ff 0%,#f8fbff 60%,#f0f9ff 100%)}
+[data-theme="fresh"] .hbg{background:radial-gradient(ellipse 60% 100% at 80% 50%,rgba(37,99,235,.08) 0%,transparent 70%)}
+[data-theme="fresh"] .header::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#2563eb 30%,#06b6d4 70%,transparent);opacity:.45}
+[data-theme="fresh"] .tbtn[data-t="fresh"]{border-color:#2563eb55;background:rgba(37,99,235,.12);color:#1d4ed8}
+[data-theme="fresh"] .brand-logo{background:#e8f0fe;border-color:rgba(37,99,235,.2)}
+[data-theme="fresh"] .sync{background:rgba(37,99,235,.06);border-color:rgba(37,99,235,.2);color:#2563eb}
+[data-theme="fresh"] .sdot{background:#2563eb}
+[data-theme="fresh"] .hbdg.live{background:rgba(220,38,38,.1);border-color:rgba(220,38,38,.3);color:#dc2626}
+[data-theme="fresh"] .hbdg.up{background:rgba(217,119,6,.1);border-color:rgba(217,119,6,.3);color:#d97706}
+[data-theme="fresh"] .bico{color:#334155;border-color:rgba(0,0,0,.12);background:rgba(0,0,0,.04)}
+[data-theme="fresh"] .bico:hover{background:rgba(0,0,0,.08);color:#0f172a}
+[data-theme="fresh"] .tb{background:#f8fbff;border-color:rgba(0,0,0,.08)}
+[data-theme="fresh"] .rb{background:#f8fbff;border-color:rgba(0,0,0,.08)}
+[data-theme="fresh"] .gs{background:#f0f5fb;scrollbar-color:rgba(0,0,0,.15) transparent}
+[data-theme="fresh"] .gs::-webkit-scrollbar-thumb{background:rgba(0,0,0,.15)}
+[data-theme="fresh"] .gr{border-bottom-color:rgba(0,0,0,.06)}
+[data-theme="fresh"] .gr:nth-child(even){background:rgba(37,99,235,.025)}
+[data-theme="fresh"] .gl{background:rgba(0,0,0,.05)}
+[data-theme="fresh"] .ev-name{text-shadow:0 1px 2px rgba(0,0,0,.08)}
+[data-theme="fresh"] .ev-rnd{color:rgba(0,0,0,.5)}
+[data-theme="fresh"] .ev-t{color:rgba(0,0,0,.38)}
+[data-theme="fresh"] .nl{box-shadow:0 0 8px rgba(220,38,38,.5),0 0 20px rgba(220,38,38,.25)}
+[data-theme="fresh"] .nlbl{background:#fff;border-color:#dc2626}
+[data-theme="fresh"] .tbar{background:rgba(255,255,255,.95);border-color:rgba(0,0,0,.07)}
+[data-theme="fresh"] .tbar-lbl{color:rgba(0,0,0,.4)}
+[data-theme="fresh"] .tbtn{color:rgba(0,0,0,.5);border-color:rgba(0,0,0,.1);background:rgba(0,0,0,.03)}
+[data-theme="fresh"] .tbtn:hover{color:rgba(0,0,0,.8);background:rgba(0,0,0,.07)}
+[data-theme="fresh"] .tml{color:#475569}
+[data-theme="fresh"] .tm.daymark .tml{color:#2563eb}
+[data-theme="fresh"] .tmk{background:rgba(0,0,0,.12)}
+[data-theme="fresh"] .sbar{background:#ffffff;border-top-color:rgba(0,0,0,.08)}
+[data-theme="fresh"] .si{border-right-color:rgba(0,0,0,.07)}
+[data-theme="fresh"] .vp{background:#ffffff;border-right-color:rgba(0,0,0,.08)}
+[data-theme="fresh"] .vrow{border-bottom-color:rgba(0,0,0,.06)}
+[data-theme="fresh"] .date-nav{border-color:rgba(0,0,0,.12);background:rgba(0,0,0,.03)}
+[data-theme="fresh"] .date-val{border-color:rgba(0,0,0,.1)}
+[data-theme="fresh"] .brng.active{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.3);color:#2563eb}
+[data-theme="fresh"] .bseg.active{background:rgba(0,0,0,.05);color:#0f172a}
+[data-theme="fresh"] .bseg.active[data-f="live"]{color:#dc2626}
+[data-theme="fresh"] .bseg.active[data-f="upcoming"]{color:#d97706}
+[data-theme="fresh"] .fseg{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
+[data-theme="fresh"] .brd.active{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.35);color:#2563eb}
+[data-theme="fresh"] .bzm{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
+[data-theme="fresh"] .bzm:hover{background:rgba(0,0,0,.08);border-color:rgba(0,0,0,.18)}
+[data-theme="fresh"] .bnow{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1);color:#2563eb}
+[data-theme="fresh"] .bnow:hover{background:rgba(37,99,235,.1);border-color:rgba(37,99,235,.3)}
+[data-theme="fresh"] .cal-popup{background:#fff;border-color:rgba(0,0,0,.14)}
+[data-theme="fresh"] .cal-day{color:#334155}
+[data-theme="fresh"] .cal-dow{color:#64748b}
+[data-theme="fresh"] .tax{background:#f8fbff;border-bottom-color:rgba(0,0,0,.07)}
+/* ══ RESPONSIVE ═══════════════════════════════════════════════ */
+@media(max-width:900px){:root{--pw:100px;--row:70px}.hi{padding:10px 14px;gap:12px}.ck-d{font-size:28px}.bs{display:none}.tb,.rb,.sbar{padding:0 12px}.tbar{padding:0 12px;gap:4px}.tbtn{padding:5px 9px;font-size:10px}}
+@media(max-width:480px){:root{--pw:72px;--row:62px;--tbh:38px}.ck-d{font-size:22px}.brand-text{display:none}.tbtn .tdot{display:none}.tbtn{padding:4px 8px;font-size:9px}}
+
+/* ══ 手机横屏优化 ══════════════════════════════════════════════ */
+@media(max-width:960px) and (orientation:landscape){
+  /* 压缩所有高度变量，把空间留给时间轴 */
+  :root{--pw:68px;--row:48px;--axh:28px;--barh:24px;--tbh:28px}
+
+  /* 主题栏极简化 */
+  .tbar{height:26px;padding:0 8px;gap:3px}
+  .tbar-lbl{display:none}
+  .tbtn{padding:2px 7px;font-size:9px;gap:4px}
+  .tdot{width:6px;height:6px}
+  .db-status{font-size:9px;gap:3px}
+  .db-dot{width:5px;height:5px}
+
+  /* 头部极简化 */
+  .hi{padding:3px 10px;gap:8px}
+  .brand-logo{width:26px;height:26px;flex-shrink:0}
+  .brand-logo img{width:20px;height:20px}
+  .brand-text{display:none}
+  .ck{flex-direction:row;align-items:center;gap:8px;justify-content:center}
+  .ck-d{font-size:18px;line-height:1}
+  .ck-m{display:none}
+  .ha{gap:4px}
+  .hbdg{padding:2px 7px;font-size:9px;gap:4px}
+  .hbdg-dot{width:5px;height:5px}
+  .bico{padding:3px 7px;font-size:9px;gap:4px}
+  .bico svg{width:11px;height:11px}
+
+  /* 工具栏极简化 */
+  .tb{height:30px;padding:0 8px;gap:2px}
+  .tbl{display:none}           /* 隐藏 "时间范围" "缩放" 标签 */
+  .tdiv{height:14px;margin:0 4px}
+  .brng{padding:2px 7px;font-size:10px}
+  .bzm{width:20px;height:20px;font-size:12px}
+  .zmv{min-width:44px;font-size:9px}
+  .bnow{padding:2px 8px;font-size:10px;gap:4px}
+  .bnow svg{width:9px;height:9px}
+  .bseg{padding:2px 7px;font-size:9px}
+  .fseg{padding:2px}
+
+  /* 赛次栏极简化 */
+  .rb{height:26px;padding:0 8px;gap:4px}
+  .rbl{font-size:8px;gap:3px}
+  .brd{padding:1px 8px;font-size:9px}
+
+  /* 场馆面板 */
+  .vph{padding:0 8px;height:28px}
+  .vphl{font-size:8px}
+  .vphc{font-size:8px}
+  .vrow{padding:0 6px}
+  .vsport{font-size:11px}
+  .vn{font-size:10px}
+  .vz{font-size:8px}
+
+  /* 时间轴事件块 */
+  .ev-name{font-size:9px}
+  .ev-rnd{font-size:7px}
+  .ev-t{font-size:7px}
+
+  /* 状态栏极简化 */
+  .sbar{padding:0 8px}
+  .si{padding:0 8px;font-size:9px;gap:4px}
+  .sidot{width:5px;height:5px}
+  .sinum{font-size:10px}
+  .sleg{display:none}           /* 隐藏图例 */
+
+  /* 全屏按钮始终可见 */
+  .fs-btn{display:flex!important}
+}
+
+/* ══ 全屏模式优化 ══════════════════════════════════════════════ */
+:fullscreen #app,::backdrop{background:var(--bg-base)}
+:fullscreen .tbar{display:none!important}
+:fullscreen .hi{padding:4px 14px}
+:fullscreen .ck-m{display:none}
+:fullscreen .brand-text{display:none}
+:fullscreen .sleg{display:none}
+:fullscreen .fs-btn svg.fs-enter{display:none}
+:fullscreen .fs-btn svg.fs-exit{display:block}
+.fs-btn svg.fs-exit{display:none}
+
+/* 全屏按钮样式 */
+.fs-btn{display:flex;align-items:center;justify-content:center;width:28px;height:28px;background:var(--bg-glass);border:1px solid var(--b2);border-radius:var(--rmd);color:var(--t2);cursor:pointer;transition:all .18s;flex-shrink:0}
+.fs-btn:hover{background:var(--bg-gh);border-color:var(--b3);color:var(--t1)}
+[data-theme="fresh"] .fs-btn{background:rgba(0,0,0,.04);border-color:rgba(0,0,0,.1)}
+
+@media(hover:none) and (pointer:coarse){.brng,.bseg,.brd,.bnow,.bzm{min-height:32px}.ev:hover{transform:none}.gs{-webkit-overflow-scrolling:touch}}
+
+/* 在竖屏手机上隐藏全屏按钮（横屏时显示） */
+@media(min-width:961px),(orientation:portrait){.fs-btn{display:none}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- THEME BAR -->
+  <div class="tbar">
+    <span class="tbar-lbl">风格</span>
+    <button class="tbtn active" data-t="cyberpunk" onclick="setTheme('cyberpunk',this)"><span class="tdot" style="background:#ff00cc;box-shadow:0 0 5px #ff00cc"></span>赛博朋克</button>
+    <button class="tbtn" data-t="beach"    onclick="setTheme('beach',this)">   <span class="tdot" style="background:#06b6d4"></span>沙滩椰林</button>
+    <button class="tbtn" data-t="fashion"  onclick="setTheme('fashion',this)"> <span class="tdot" style="background:#c9a84c"></span>现代时尚</button>
+    <button class="tbtn" data-t="chinese"  onclick="setTheme('chinese',this)"> <span class="tdot" style="background:#ff1a2e;box-shadow:0 0 5px #ff1a2e"></span>马年中国风</button>
+    <button class="tbtn" data-t="fresh"    onclick="setTheme('fresh',this)">   <span class="tdot" style="background:#2563eb"></span>清新</button>
+    <div class="db-status"><div class="db-dot connecting" id="dbDot"></div><span id="dbLbl">连接中…</span></div>
+  </div>
+
+  <!-- HEADER -->
+  <header class="header">
+    <div class="hbg"></div>
+    <div class="hi">
+      <div class="brand">
+        <div class="brand-logo">
+          <img src="https://upload.wikimedia.org/wikipedia/en/thumb/8/82/Asian_Beach_Games_logo.png/200px-Asian_Beach_Games_logo.png" alt="ABG" onerror="this.style.display='none'">
+        </div>
+        <div class="brand-text">
+          <span class="bn" id="appTitle">亚沙会智慧转播赛程管理系统</span>
+          <span class="bs" id="appSub">Asian Beach Games · Broadcast Management</span>
+        </div>
+      </div>
+      <div class="ck">
+        <div class="ck-d"><span id="ch">00</span><span class="sep">:</span><span id="cm">00</span><span class="sep">:</span><span id="cs">00</span></div>
+        <div class="ck-m">
+          <span class="ck-date" id="cdate">—</span>
+          <div class="sync"><div class="sdot"></div><span id="syncLbl">当地时间</span></div>
+        </div>
+      </div>
+      <div class="ha">
+        <div class="hbdg live"><div class="hbdg-dot"></div><span id="liveLbl">直播: 0</span></div>
+        <div class="hbdg up"><div class="hbdg-dot"></div><span id="upLbl">即将: 0</span></div>
+        <a href="live-cue-admin.html" class="bico">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+          <span id="adminLbl">管理后台</span>
+        </a>
+        <button class="bico" onclick="toggleLang()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15 15 0 0 1 0 20M2 12h20"/></svg><span id="langBtn">中</span></button>
+        <button class="fs-btn" id="fsBtn" onclick="toggleFullscreen()" title="全屏">
+          <svg class="fs-enter" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+          <svg class="fs-exit" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><line x1="10" y1="14" x2="3" y2="21"/><line x1="21" y1="3" x2="14" y2="10"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- TOOLBAR -->
+  <div class="tb">
+    <span class="tbl">时间范围</span>
+    <button class="brng" data-r="1h" onclick="setRange(this,'1h')">1小时</button>
+    <button class="brng active" data-r="1d" onclick="setRange(this,'1d')">1天</button>
+    <button class="brng" data-r="games" onclick="setRange(this,'games')">本赛事</button>
+    <div class="tdiv"></div>
+    <div class="date-nav">
+      <button onclick="shiftDay(-1)">‹</button>
+      <span class="date-val" id="dval" onclick="toggleCalendar(event)">—</span>
+      <button onclick="shiftDay(1)">›</button>
+    </div>
+    <div class="tdiv"></div>
+    <span class="tbl">缩放</span>
+    <div class="zm-g">
+      <button class="bzm" onclick="doZoom(-1)">−</button>
+      <span class="zmv" id="zmv">1440分钟</span>
+      <button class="bzm" onclick="doZoom(1)">+</button>
+    </div>
+    <div class="tdiv"></div>
+    <button class="bnow" onclick="scrollNow()">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.22 4.22l2.12 2.12M17.66 17.66l2.12 2.12M2 12h3M19 12h3M4.22 19.78l2.12-2.12M17.66 6.34l2.12-2.12" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
+      回到当前
+    </button>
+    <div class="tdiv"></div>
+    <div class="fseg">
+      <button class="bseg active" data-f="all"      onclick="setSF(this,'all')">全部</button>
+      <button class="bseg"        data-f="live"     onclick="setSF(this,'live')">直播中</button>
+      <button class="bseg"        data-f="upcoming" onclick="setSF(this,'upcoming')">即将</button>
+    </div>
+  </div>
+
+  <!-- ROUND BAR -->
+  <div class="rb" id="rb">
+    <span class="rbl"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="22 3 2 3 10 12.5 10 19 14 21 14 12.5 22 3"/></svg>赛次</span>
+    <button class="brd" data-r="半决赛" onclick="setRF(this,'半决赛')">半决赛</button>
+    <button class="brd" data-r="决赛" onclick="setRF(this,'决赛')">决赛</button>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="tl">
+    <div class="vp">
+      <div class="vph"><span class="vphl">场馆/项目</span><span class="vphc" id="vcnt">—</span></div>
+      <div class="vlist" id="vlist"></div>
+    </div>
+    <div class="gs" id="gs">
+      <div class="gi" id="gi">
+        <div class="tax" id="tax"></div>
+        <div class="grs" id="grs"></div>
+        <div class="nl" id="nl"><div class="nlbl">NOW</div><div class="ndm"></div></div>
+      </div>
+      <div class="overlay" id="loading"><div class="spin"></div><div class="overlay-txt" id="loadTxt">连接数据库…</div></div>
+      <div class="err-banner" id="errBanner"></div>
+      <div class="empty-state" id="emptyState"><div class="es-icon">📅</div><div class="es-txt" id="emptyTxt">此日期暂无赛事</div><div class="es-sub">请使用 ‹ › 切换日期</div></div>
+    </div>
+  </div>
+
+  <!-- STATUS BAR -->
+  <div class="sbar">
+    <div class="si"><span>赛事</span><span class="sinum" id="sbTotal">—</span></div>
+    <div class="si"><div class="sidot" style="background:#ef4444;box-shadow:0 0 4px #ef4444"></div><span>直播中</span><span class="sinum" id="sbLive">—</span></div>
+    <div class="si"><div class="sidot" style="background:var(--up)"></div><span>即将</span><span class="sinum" id="sbUp">—</span></div>
+    <div class="si"><div class="sidot" style="background:#475569"></div><span>已完成</span><span class="sinum" id="sbDone">—</span></div>
+    <div class="sleg">
+      <div class="leg"><div class="legpill" style="background:#ef4444"></div><span>直播</span></div>
+      <div class="leg"><div class="legpill dash" style="border-color:var(--up)"></div><span>即将</span></div>
+      <div class="leg"><div class="legpill" style="background:#334155"></div><span>完成</span></div>
+    </div>
+  </div>
+</div>
+<div class="tt" id="tt"><div class="tt-title" id="ttt"></div><div id="ttb"></div></div>
+<div class="cal-popup" id="calPopup"></div>
+
+<script>
+/* ═══════════════════════════════════════════════
+   SUPABASE CONFIG
+═══════════════════════════════════════════════ */
+const SB_URL = 'https://mdgfcgxtlxgzkvoiqonp.supabase.co';
+const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2ZjZ3h0bHhnemt2b2lxb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTcwMjIsImV4cCI6MjA4OTEzMzAyMn0.ds9Ab_HkRNsUDSUrTlfJ5NpmlywgWwotNei4YX3Oo-k';
+const { createClient } = supabase;
+const db = createClient(SB_URL, SB_KEY);
+
+/* ═══════════════════════════════════════════════
+   STATE  — continuous NLE-style timeline
+═══════════════════════════════════════════════ */
+const PPM_MIN=0.012, PPM_MAX=30;
+let PPM=0.83, sf='all', isZh=true;
+let selectedRounds=new Set(); // empty = show all rounds
+let VENUES=[], allEvts=[];
+let _activeDateKey=''; // YYYY-MM-DD of the currently displayed day
+let _rangeMode='1d';        // '1h' | '1d' | 'games'
+let _savedAnchorTs=null;    // anchorTs before games mode, restored on exit
+
+/* ── Ceremony hardcoded data ───────────────────── */
+const _CER_OPEN_ID ='__ceremony_open__';
+const _CER_CLOSE_ID='__ceremony_close__';
+const _CER_OPEN_START =new Date(2026,3,22,20, 0,0).getTime(); // Apr 22 20:00
+const _CER_OPEN_END   =new Date(2026,3,22,21,15,0).getTime(); // Apr 22 21:15
+const _CER_CLOSE_START=new Date(2026,3,30,20, 0,0).getTime(); // Apr 30 20:00
+const _CER_CLOSE_END  =new Date(2026,3,30,21,15,0).getTime(); // Apr 30 21:15
+
+// Inject / re-inject ceremony rows — call after every loadData()
+function injectCeremonies(){
+  // Remove previous injections so re-loads don't duplicate
+  VENUES  =VENUES  .filter(v=>!v.id.startsWith('__ceremony'));
+  allEvts =allEvts .filter(e=>!e.venue_id.startsWith('__ceremony'));
+  // Build venue objects using the same darken() helper as DB venues
+  const openV ={id:_CER_OPEN_ID, name:'开幕式',short_name:'开幕式',
+                color:'#f59e0b',_bg1:darken('#f59e0b',.25),_bg2:darken('#f59e0b',.45),is_active:true};
+  const closeV={id:_CER_CLOSE_ID,name:'闭幕式',short_name:'闭幕式',
+                color:'#818cf8',_bg1:darken('#818cf8',.25),_bg2:darken('#818cf8',.45),is_active:true};
+  VENUES.unshift(openV);   // opening always first
+  VENUES.push(closeV);     // closing always last
+  allEvts.push(
+    {id:'__cev_open__', venue_id:_CER_OPEN_ID,
+     name:'亚沙会开幕式\nABG Opening Ceremony',
+     round:'',start_time:_CER_OPEN_START,end_time:_CER_OPEN_END,
+     is_medal_event:false,broadcast_channel:null,notes:null},
+    {id:'__cev_close__',venue_id:_CER_CLOSE_ID,
+     name:'亚沙会闭幕式\nABG Closing Ceremony',
+     round:'',start_time:_CER_CLOSE_START,end_time:_CER_CLOSE_END,
+     is_medal_event:false,broadcast_channel:null,notes:null}
+  );
+}
+let _lastDailyRefresh=0;      // for 02:00 auto-refresh
+const _d0=new Date();_d0.setHours(0,0,0,0);
+let anchorTs=_d0.getTime()-7200000; // default: today 00:00 - 2h
+let viewDate=new Date(); // derived from scroll center, used by calendar
+
+/* ═══════════════════════════════════════════════
+   DB STATUS
+═══════════════════════════════════════════════ */
+function dbStatus(s,txt){
+  const dot=document.getElementById('dbDot');
+  const lbl=document.getElementById('dbLbl');
+  dot.className='db-dot '+s; lbl.textContent=txt;
+}
+
+/* ═══════════════════════════════════════════════
+   DATA LOADING
+═══════════════════════════════════════════════ */
+async function loadData(){
+  showLoading(true,isZh?'加载数据…':'Loading…');
+  try{
+    // Load ALL events — continuous timeline needs full dataset
+    const [
+      {data:vd,error:ve},
+      {data:ed,error:ee}
+    ]=await Promise.all([
+      db.from('venues').select('*').eq('is_active',true).order('name'),
+      db.from('events').select('*').order('start_time').limit(10000)
+    ]);
+    if(ve) throw ve;
+    if(ee) throw ee;
+    VENUES=(vd||[]).map(v=>({...v,_bg1:darken(v.color,.25),_bg2:darken(v.color,.45)}));
+    allEvts=ed||[];
+    injectCeremonies(); // add opening/closing ceremony rows
+
+    // Set anchor to min(earliest event, today midnight) - 2h padding
+    // This ensures "now" is always a reachable position on the timeline
+    if(allEvts.length){
+      const earliest=Math.min(...allEvts.map(e=>e.start_time));
+      const todayMid=new Date();todayMid.setHours(0,0,0,0);
+      anchorTs=Math.min(earliest, todayMid.getTime())-7200000;
+    } else {
+      const todayMid=new Date();todayMid.setHours(0,0,0,0);
+      anchorTs=todayMid.getTime()-7200000;
+    }
+
+    dbStatus('live',isZh?'实时连接':'Connected');
+    showLoading(false);
+    render();
+    updateRoundFilter();
+    showEmptyState(allEvts.length===0);
+  }catch(err){
+    showLoading(false);
+    dbStatus('error',isZh?'连接失败':'Error');
+    showErr(err.message||(isZh?'数据库连接失败':'Database connection failed'));
+  }
+}
+
+function showEmptyState(show){
+  const es=document.getElementById('emptyState');
+  if(es) es.style.display=show?'flex':'none';
+}
+
+function updateRoundFilter(){
+  // Fixed buttons only: 半决赛 + 决赛 — just sync active state
+  document.querySelectorAll('.brd[data-r]').forEach(b=>{
+    const r=b.getAttribute('data-r');
+    b.classList.toggle('active', selectedRounds.has(r));
+    b.textContent=isZh?r:_translateStr(r);
+  });
+}
+
+/* ═══════════════════════════════════════════════
+   REALTIME SUBSCRIPTION
+═══════════════════════════════════════════════ */
+let _rtCh=null;
+function setupRealtime(){
+  if(_rtCh){try{db.removeChannel(_rtCh);}catch(_){} _rtCh=null;}
+  _rtCh=db.channel('live-cue')
+    .on('postgres_changes',{event:'*',schema:'public',table:'events'},p=>{
+      const {eventType:t,new:nw,old:ol}=p;
+      // INSERT: only add if it falls within the current view window
+      if(t==='INSERT') allEvts.push(nw);
+      else if(t==='UPDATE'){const i=allEvts.findIndex(e=>e.id===nw.id);if(i>=0)allEvts[i]=nw;}
+      else if(t==='DELETE') allEvts=allEvts.filter(e=>e.id!==ol.id);
+      renderRows(gridW()); refreshCounts();
+    })
+    .on('postgres_changes',{event:'*',schema:'public',table:'venues'},()=>loadData())
+    .subscribe(s=>{
+      if(s==='SUBSCRIBED') dbStatus('live',isZh?'实时同步':'Realtime');
+      else if(s==='CHANNEL_ERROR') dbStatus('error',isZh?'实时失败':'RT Error');
+    });
+}
+
+/* ═══════════════════════════════════════════════
+   TIME HELPERS  — continuous timeline
+═══════════════════════════════════════════════ */
+function gridW(){
+  const gsW=document.getElementById('gs').clientWidth||800;
+  if(_rangeMode==='games'&&allEvts.length){
+    // Hard-bounded games window: anchorTs (= earliest−5d) → latest+5d
+    const latest=Math.max(...allEvts.map(e=>e.end_time));
+    const gamesEnd=latest+5*86400000;
+    return Math.max((gamesEnd-anchorTs)/60000*PPM, gsW);
+  }
+  // Normal mode: extend at least 2h past now so "回到当前" always works
+  const nowPad=Date.now()+7200000;
+  if(!allEvts.length) return Math.max((nowPad-anchorTs)/60000*PPM, gsW);
+  const latest=Math.max(Math.max(...allEvts.map(e=>e.end_time)), nowPad);
+  const totalMins=(latest-anchorTs)/60000+120;
+  return Math.max(totalMins*PPM, gsW);
+}
+function tsToX(ts){ return ((ts-anchorTs)/60000)*PPM; }
+function fmtTs(ts){
+  const d=new Date(ts);
+  return p2(d.getHours())+':'+p2(d.getMinutes());
+}
+function fmtDate(ts){
+  const d=new Date(ts);
+  return `${d.getMonth()+1}/${d.getDate()}`;
+}
+
+/* ═══════════════════════════════════════════════
+   CLOCK
+═══════════════════════════════════════════════ */
+function tick(){
+  const n=new Date();
+  document.getElementById('ch').textContent=p2(n.getHours());
+  document.getElementById('cm').textContent=p2(n.getMinutes());
+  document.getElementById('cs').textContent=p2(n.getSeconds());
+  const WD=isZh?['日','一','二','三','四','五','六'][n.getDay()]:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][n.getDay()];
+  const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  document.getElementById('cdate').textContent=isZh
+    ?`${n.getFullYear()}年${n.getMonth()+1}月${n.getDate()}日 星期${WD}`
+    :`${n.getDate()} ${MON[n.getMonth()]} ${n.getFullYear()} ${WD}`;
+  moveNow();
+  // refreshCounts is expensive — throttle to once per second instead of 60fps
+  const _ms=n.getTime();
+  if(_ms-_tickLast>=1000){
+    refreshCounts();
+    _tickLast=_ms;
+    // Auto-refresh data at 02:00 AM daily (and no more than once per hour)
+    if(n.getHours()===2&&n.getMinutes()===0&&n.getSeconds()<5&&_ms-_lastDailyRefresh>3600000){
+      _lastDailyRefresh=_ms;
+      loadData().then(()=>{renderVenues();});
+    }
+  }
+  requestAnimationFrame(tick);
+}
+let _tickLast=0;
+const p2=v=>String(v).padStart(2,'0');
+
+/* ═══════════════════════════════════════════════
+   EVENT STATUS
+═══════════════════════════════════════════════ */
+function evStatus(ev){
+  const now=Date.now();
+  if(now>=ev.start_time&&now<ev.end_time) return 'live';
+  if(now<ev.start_time) return 'upcoming';
+  return 'finished';
+}
+function refreshCounts(){
+  let live=0,up=0,done=0;
+  allEvts.forEach(e=>{const s=evStatus(e);if(s==='live')live++;else if(s==='upcoming')up++;else done++;});
+  const tot=allEvts.length;
+  document.getElementById('liveLbl').textContent=isZh?`直播: ${live}`:`Live: ${live}`;
+  document.getElementById('upLbl').textContent=isZh?`即将: ${up}`:`Soon: ${up}`;
+  document.getElementById('sbTotal').textContent=tot;
+  document.getElementById('sbLive').textContent=live;
+  document.getElementById('sbUp').textContent=up;
+  document.getElementById('sbDone').textContent=done;
+}
+
+/* ═══════════════════════════════════════════════
+   NOW LINE
+═══════════════════════════════════════════════ */
+function moveNow(){
+  const nl=document.getElementById('nl'); if(!nl)return;
+  const x=tsToX(Date.now());
+  const gw=gridW();
+  if(x<0||x>gw){nl.style.display='none';return;}
+  nl.style.display='block';
+  const rh=parseInt(getComputedStyle(document.documentElement).getPropertyValue('--row').trim())||80;
+  nl.style.left=x+'px';
+  nl.style.height=(rh*getActiveVenues().length+46)+'px';
+}
+
+/* ═══════════════════════════════════════════════
+   RENDER
+═══════════════════════════════════════════════ */
+function render(){
+  // Always sync viewDate from actual scroll position before rendering venues
+  if(_rangeMode!=='games') syncViewDate();
+  const gw=gridW();
+  document.getElementById('gi').style.width=gw+'px';
+  renderVenues(); renderAxis(gw); renderRows(gw); moveNow(); updateZL();
+}
+
+function getActiveVenues(){
+  if(_rangeMode==='games'){
+    // Full-games view: show every venue that has any event at all
+    const ids=new Set(allEvts.map(ev=>ev.venue_id));
+    return VENUES.filter(v=>ids.has(v.id));
+  }
+  // 1h / 1d view: show only venues with events on the currently viewed date
+  const d=viewDate||new Date();
+  const s=new Date(d);s.setHours(0,0,0,0);
+  const e=new Date(d);e.setHours(23,59,59,999);
+  const ids=new Set(allEvts.filter(ev=>ev.start_time<e.getTime()&&ev.end_time>s.getTime()).map(ev=>ev.venue_id));
+  return VENUES.filter(v=>ids.has(v.id));
+}
+
+function renderVenues(){
+  const ac=document.getElementById('vlist').scrollTop||0;
+  const activeVenues=getActiveVenues();
+  document.getElementById('vlist').innerHTML=activeVenues.map(v=>{
+    const icon=getSportIcon(v.short_name||v.name);
+    return `<div class="vrow" style="--vc:${v.color}">
+      <div class="vi" style="flex-direction:row;align-items:center;gap:6px">
+        <span class="vsport">${icon}</span>
+        <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
+          <span class="vn">${getVenueName(v)}</span>
+          <span class="vz">${getVenueSubName(v)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('vcnt').textContent=isZh?`共${activeVenues.length}个`:`${activeVenues.length} venues`;
+  document.getElementById('vlist').scrollTop=ac;
+}
+
+function renderAxis(gw){
+  const ax=document.getElementById('tax');
+  ax.innerHTML=''; ax.style.width=gw+'px';
+  const totalMins=gw/PPM;
+  // Step size based on zoom level (PPM)
+  let step;
+  if(PPM>=5) step=15;           // 1h view → 15min marks
+  else if(PPM>=0.3) step=60;    // 1d view → 1h marks
+  else step=1440;                // 30d view → 1day marks
+
+  const firstAligned=Math.ceil(0/step)*step;
+  for(let m=firstAligned;m<=totalMins;m+=step){
+    const ts=anchorTs+m*60000;
+    const d=new Date(ts);
+    const isDayBoundary=(d.getHours()===0&&d.getMinutes()===0);
+    let lbl;
+    if(step>=1440) lbl=`${d.getMonth()+1}/${d.getDate()}`;
+    else lbl=isDayBoundary?`${d.getMonth()+1}/${d.getDate()}`:p2(d.getHours())+':'+p2(d.getMinutes());
+    const mk=document.createElement('div');
+    mk.className='tm'+(isDayBoundary?' daymark':'');
+    mk.style.left=(m*PPM)+'px';
+    mk.innerHTML=`<span class="tml">${lbl}</span><div class="tmk"></div>`;
+    ax.appendChild(mk);
+  }
+}
+
+function renderRows(gw){
+  const gr=document.getElementById('grs'); gr.innerHTML='';
+  const totalMins=gw/PPM;
+  const activeVenues=getActiveVenues();
+  // Grid line step based on zoom
+  let glStep;
+  if(PPM>=5) glStep=60;
+  else if(PPM>=0.3) glStep=360;
+  else glStep=1440;
+
+  activeVenues.forEach(venue=>{
+    const row=document.createElement('div');
+    row.className='gr'; row.style.width=gw+'px';
+    for(let m=0;m<=totalMins;m+=glStep){
+      const gl=document.createElement('div');gl.className='gl';gl.style.left=(m*PPM)+'px';row.appendChild(gl);
+    }
+    // Events for this venue
+    const vevts=allEvts.filter(e=>e.venue_id===venue.id);
+    vevts.forEach(ev=>{
+      const st=evStatus(ev);
+      if(sf!=='all'&&st!==sf) return;
+      if(selectedRounds.size>0&&!selectedRounds.has(ev.round)) return;
+      const startX=tsToX(ev.start_time);
+      const endX=tsToX(ev.end_time);
+      if(endX<0||startX>gw) return;
+      const left=Math.max(startX,0);
+      const width=Math.max(endX-startX,24);
+      const b=document.createElement('div');
+      b.className=`ev ${st}`;
+      b.style.left=left+'px'; b.style.width=width+'px';
+      b.style.setProperty('--ec',venue.color);
+      styleEvt(b,venue,st);
+      const sh=fmtTs(ev.start_time),eh=fmtTs(ev.end_time);
+      b.innerHTML=`<div class="evi">
+        ${ev.is_medal_event?'<span class="ev-medal">🥇</span>':''}
+        <span class="ev-name">${isZh?ev.name:getEventName(ev.name)}</span>
+        <span class="ev-rnd">${getRoundName(ev.round)}</span>
+        <span class="ev-t">${sh}–${eh}</span>
+      </div>`;
+      b.addEventListener('mouseenter',e=>showTT(e,venue,ev,st));
+      b.addEventListener('mousemove',moveTT);
+      b.addEventListener('mouseleave',hideTT);
+      row.appendChild(b);
+    });
+    gr.appendChild(row);
+  });
+}
+
+function styleEvt(b,v,st){
+  const c=v.color, bg1=v._bg1, bg2=v._bg2;
+  if(st==='finished'){b.style.background=`linear-gradient(135deg,${bg1}cc,${bg1}77)`;b.style.border=`1px solid ${c}18`;}
+  else if(st==='live'){b.style.background=`linear-gradient(135deg,${bg1},${bg2}bb)`;b.style.border=`1.5px solid ${c}`;b.style.boxShadow=`0 0 14px ${c}44,inset 0 1px 0 rgba(255,255,255,.1)`;}
+  else{b.style.background=`linear-gradient(135deg,${bg1}88,${bg1}44)`;b.style.borderColor=c;}
+}
+
+function darken(hex,amt){
+  if(!hex||!hex.startsWith('#')) return '#334155';
+  const r=parseInt(hex.slice(1,3),16),g=parseInt(hex.slice(3,5),16),bl=parseInt(hex.slice(5,7),16);
+  const toH=v=>Math.round(v*amt).toString(16).padStart(2,'0');
+  return `#${toH(r)}${toH(g)}${toH(bl)}`;
+}
+
+/* ═══════════════════════════════════════════════
+   CONTROLS  — NLE-style continuous zoom
+═══════════════════════════════════════════════ */
+function doZoom(d){
+  const gsEl=document.getElementById('gs');
+  const gsW=gsEl.clientWidth||800;
+  const centerTs=anchorTs+((gsEl.scrollLeft+gsW/2)/PPM)*60000;
+  PPM=Math.max(PPM_MIN,Math.min(PPM_MAX, PPM*(d>0?1.5:1/1.5)));
+  // Expand grid FIRST so the new scrollLeft isn't clamped to the old (smaller) grid
+  document.getElementById('gi').style.width=gridW()+'px';
+  gsEl.scrollLeft=Math.max(0,tsToX(centerTs)-gsW/2);
+  render(); // syncViewDate reads correct scrollLeft → correct viewDate
+  updateDateLabel();
+}
+function updateZL(){
+  const gsW=document.getElementById('gs').clientWidth||800;
+  const visMin=Math.round(gsW/PPM);
+  let lbl;
+  if(visMin<120) lbl=visMin+(isZh?'分钟':'min');
+  else if(visMin<2880) lbl=Math.round(visMin/60)+(isZh?'小时':'h');
+  else lbl=Math.round(visMin/1440)+(isZh?'天':'d');
+  document.getElementById('zmv').textContent=lbl;
+}
+
+function setRange(btn,k){
+  document.querySelectorAll('.brng').forEach(b=>b.classList.remove('active'));btn.classList.add('active');
+  const gsEl=document.getElementById('gs');
+  const gsW=gsEl.clientWidth||800;
+
+  if(k==='games'){
+    if(!allEvts.length){_rangeMode=k;PPM=PPM_MIN;render();return;}
+    const earliest=Math.min(...allEvts.map(e=>e.start_time));
+    const latest  =Math.max(...allEvts.map(e=>e.end_time));
+    const gamesStart=earliest-5*86400000; // 5 days before first event
+    const gamesEnd  =latest  +5*86400000; // 5 days after  last  event
+    const spanMins=(gamesEnd-gamesStart)/60000;
+    if(_rangeMode!=='games') _savedAnchorTs=anchorTs;
+    anchorTs=gamesStart;
+    _rangeMode=k;
+    PPM=Math.max(PPM_MIN,Math.min(PPM_MAX,gsW/spanMins));
+    // Expand grid FIRST, then position on Date.now() (clamped to games window)
+    document.getElementById('gi').style.width=gridW()+'px';
+    const nowX=tsToX(Date.now());
+    const maxScroll=Math.max(0,gridW()-gsW);
+    gsEl.scrollLeft=Math.max(0,Math.min(nowX-gsW/2,maxScroll));
+    render(); // all venues rendered because _rangeMode==='games'
+  } else {
+    // Restore original anchorTs when leaving games mode
+    if(_rangeMode==='games'&&_savedAnchorTs!==null){
+      anchorTs=_savedAnchorTs; _savedAnchorTs=null;
+    }
+    const centerTs=anchorTs+((gsEl.scrollLeft+gsW/2)/PPM)*60000;
+    _rangeMode=k;
+    const mins={'1h':60,'1d':1440};
+    PPM=Math.max(PPM_MIN,Math.min(PPM_MAX,gsW/mins[k]));
+    // ① Expand grid FIRST — without this, browser clamps scrollLeft to the old
+    //   (narrower) grid width, causing syncViewDate() to read the wrong position
+    document.getElementById('gi').style.width=gridW()+'px';
+    // ② Now safe to set the correct scroll position
+    gsEl.scrollLeft=Math.max(0,tsToX(centerTs)-gsW/2);
+    // ③ Force date re-evaluation so renderVenues()+renderRows() use new viewDate
+    _activeDateKey='';
+    render(); // syncViewDate() reads correct scrollLeft → correct viewDate
+  }
+  updateDateLabel();
+}
+function setSF(btn,f){document.querySelectorAll('.bseg').forEach(b=>b.classList.remove('active'));btn.classList.add('active');sf=f;renderRows(gridW());}
+function setRF(btn,r){
+  // Toggle: active = filter ON for that round; none active = show all
+  if(selectedRounds.has(r)){selectedRounds.delete(r);btn.classList.remove('active');}
+  else{selectedRounds.add(r);btn.classList.add('active');}
+  renderRows(gridW());
+}
+
+function shiftDay(d){
+  // Advance/retreat by one day relative to the currently displayed date.
+  // Use _activeDateKey as the authoritative base — viewDate can be temporarily
+  // corrupted by the scroll handler firing syncViewDate() during smooth-scroll
+  // animations, but _activeDateKey is only set by explicit navigation actions.
+  let base;
+  if(_activeDateKey){
+    const [ky,km,kd]=_activeDateKey.split('-').map(Number);
+    base=new Date(ky,km-1,kd,12,0,0);
+  } else {
+    base=viewDate||new Date();
+  }
+  const t=new Date(base.getFullYear(),base.getMonth(),base.getDate()+d,12,0,0);
+  pickDate(t.getFullYear(),t.getMonth(),t.getDate());
+}
+// Read current scroll center → update viewDate.
+// Returns the YYYY-MM-DD string for the new center date.
+function syncViewDate(){
+  const gsEl=document.getElementById('gs');
+  const centerTs=anchorTs+((gsEl.scrollLeft+(gsEl.clientWidth||800)/2)/PPM)*60000;
+  viewDate=new Date(centerTs);
+  return `${viewDate.getFullYear()}-${p2(viewDate.getMonth()+1)}-${p2(viewDate.getDate())}`;
+}
+
+function updateDateLabel(){
+  // Only update the displayed date text — do NOT re-render venues here.
+  // The venue list is intentionally stable while the user scrolls; it only
+  // refreshes on explicit navigation (pickDate / scrollNow / setRange / render).
+  syncViewDate();
+  const d=viewDate;
+  document.getElementById('dval').textContent=`${d.getFullYear()}/${p2(d.getMonth()+1)}/${p2(d.getDate())}`;
+}
+function scrollNow(){
+  const gs=document.getElementById('gs');
+  const gsW=gs.clientWidth||800;
+
+  if(_rangeMode==='games'){
+    // Exit games mode → switch to 1d, then position on now.
+    const nowBtn=document.querySelector('.brng[data-r="1d"]');
+    if(nowBtn) setRange(nowBtn,'1d');
+    // setRange restored anchorTs and scrolled to the old center; now override to today.
+    const gw=gridW();
+    document.getElementById('gi').style.width=gw+'px';
+    gs.scrollLeft=Math.max(0,tsToX(Date.now())-gsW/2);
+    // render() re-syncs viewDate from the new scrollLeft and refreshes venue list.
+    render();
+    return;
+  }
+
+  // Pre-expand grid FIRST (prevents browser clamping scrollLeft to old smaller width).
+  // Use instant scroll — smooth scroll fires many scroll events that rebuild DOM mid-flight.
+  const gw=gridW();
+  document.getElementById('gi').style.width=gw+'px';
+  gs.scrollLeft=Math.max(0,Math.min(tsToX(Date.now())-gsW/2, Math.max(0,gw-gsW)));
+  // render() re-syncs viewDate → today → refreshes venue list to today's events.
+  render();
+}
+/* ═══════════════════════════════════════════════
+   SPORT ICON MAPPING
+═══════════════════════════════════════════════ */
+const SPORT_ICONS={
+  '沙滩排球':'🏐','排球':'🏐','Beach Volleyball':'🏐',
+  '沙滩足球':'⚽','足球':'⚽','Beach Soccer':'⚽',
+  '沙滩手球':'🤾','手球':'🤾','Beach Handball':'🤾',
+  '冲浪':'🏄','Surfing':'🏄',
+  '帆板':'⛵','帆船':'⛵','Sailing':'⛵',
+  '游泳':'🏊','Swimming':'🏊','公开水域':'🏊',
+  '潜水':'🤿','Diving':'🤿',
+  '皮划艇':'🛶','Canoe':'🛶','Kayak':'🛶',
+  '田径':'🏃','Athletics':'🏃',
+  '篮球':'🏀','三人篮球':'🏀','3x3 Basketball':'🏀',
+  '柔道':'🥋','Judo':'🥋','空手道':'🥋','Karate':'🥋',
+  '跆拳道':'🥋','Taekwondo':'🥋',
+  '摔跤':'🤼','Wrestling':'🤼',
+  '举重':'🏋️','Weightlifting':'🏋️',
+  '射击':'🎯','Shooting':'🎯',
+  '射箭':'🏹','Archery':'🏹',
+  '自行车':'🚴','Cycling':'🚴',
+  '马术':'🏇','Equestrian':'🏇',
+  '铁人三项':'🏊','Triathlon':'🏊',
+  '攀岩':'🧗','Climbing':'🧗',
+  '滑板':'🛹','Skateboarding':'🛹',
+  '网球':'🎾','Tennis':'🎾','沙滩网球':'🎾',
+  '乒乓球':'🏓','Table Tennis':'🏓',
+  '羽毛球':'🏸','Badminton':'🏸',
+  '拳击':'🥊','Boxing':'🥊',
+  '击剑':'🤺','Fencing':'🤺',
+  '橄榄球':'🏉','Rugby':'🏉',
+  '曲棍球':'🏑','Hockey':'🏑',
+  '水球':'🤽','Water Polo':'🤽',
+  '体操':'🤸','Gymnastics':'🤸',
+  '武术':'🥋','Wushu':'🥋',
+  '克柔术':'🥋','Kurash':'🥋',
+  '柔术':'🥋','Jiu Jitsu':'🥋','Jiujitsu':'🥋',
+  '卡巴迪':'🤼','Kabaddi':'🤼',
+  '台克球':'🏓','Teqball':'🏓',
+  '游跑两项':'🏊','Aquathlon':'🏊',
+  '沙滩田径':'🏃','Beach Athletics':'🏃',
+  '电子竞技':'🎮','Esports':'🎮',
+  '风筝冲浪':'🪁','Kite Surfing':'🪁',
+  '龙舟':'🐉','Dragon Boat':'🐉',
+  '开幕式':'🎆','Opening Ceremony':'🎆',
+  '闭幕式':'🎇','Closing Ceremony':'🎇',
+  '壁球':'🏸','Squash':'🏸',
+  '棒球':'⚾','Baseball':'⚾','垒球':'🥎','Softball':'🥎',
+};
+function getSportIcon(name){
+  if(!name) return '🏟️';
+  for(const[k,v] of Object.entries(SPORT_ICONS)){if(name.includes(k)) return v;}
+  return '🏟️';
+}
+
+/* ═══════════════════════════════════════════════
+   CN→EN TRANSLATION TABLES
+═══════════════════════════════════════════════ */
+const VENUE_EN={
+  // ── 2025 Sanya Asian Beach Games (confirmed from schedule Excel) ──
+  '公开水域游泳':'Open Water Swimming','公开水域':'Open Water',
+  '水球':'Water Polo',
+  '三人篮球':'3×3 Basketball',
+  '沙滩田径':'Beach Athletics',
+  '龙舟':'Dragon Boat',
+  '沙滩足球':'Beach Football',
+  '沙滩手球':'Beach Handball',
+  '柔术':'Jiu Jitsu',                 // NOT Kurash — confirmed from Excel
+  '沙滩卡巴迪':'Beach Kabaddi','卡巴迪':'Kabaddi',
+  '帆船':'Sailing','帆板':'Windsurfing',
+  '攀岩':'Sport Climbing',
+  '台克球':'Teqball',                 // NOT Sepaktakraw — confirmed from Excel
+  '游跑两项':'Aquathlon','游跑':'Aquathlon','水上游跑':'Aquathlon',
+  '沙滩排球':'Beach Volleyball',
+  '沙滩摔跤':'Beach Wrestling',
+  // ── Other common sports ──
+  '排球':'Volleyball',
+  '足球':'Football','沙滩足球':'Beach Football',
+  '手球':'Handball',
+  '藤球':'Sepaktakraw','沙滩藤球':'Beach Sepaktakraw',
+  '冲浪':'Surfing',
+  '游泳':'Swimming',
+  '铁人三项':'Triathlon','皮划艇':'Canoe/Kayak',
+  '赛艇':'Rowing',
+  '跆拳道':'Taekwondo','柔道':'Judo','空手道':'Karate',
+  '武术':'Wushu','克柔术':'Kurash','摔跤':'Wrestling',
+  '3x3篮球':'3×3 Basketball','篮球':'Basketball',
+  '沙滩网球':'Beach Tennis','网球':'Tennis',
+  '滑板':'Skateboarding',
+  '风筝冲浪':'Kiteboarding','水上摩托':'Jet Ski',
+  '自行车':'Cycling','山地自行车':'MTB Cycling','田径':'Athletics',
+  '射击':'Shooting','射箭':'Archery',
+  '举重':'Weightlifting','体操':'Gymnastics','沙滩健美':'Beach Fitness',
+  '武装越野':'Military Pentathlon',
+  '开幕式':'Opening Ceremony','闭幕式':'Closing Ceremony','颁奖':'Medal Ceremony',
+};
+const TERM_EN={
+  // Phase / round names (confirmed from Excel schedule)
+  '预赛阶段':'Preliminary Phase','预赛':'Prelims',
+  '资格赛':'Qualifier','小组赛':'Group Stage','单循环赛':'Single Round Robin',
+  '单循环决赛':'Round-Robin Final','循环赛':'Round Robin',
+  '循环赛第一轮':'Round 1','循环赛第二轮':'Round 2','循环赛第三轮':'Round 3',
+  '第一轮':'Round 1','第二轮':'Round 2','第三轮':'Round 3',
+  '决赛阶段-32强':'Final Phase – R32','决赛阶段-16强':'Final Phase – R16',
+  '决赛阶段-8强':'Final Phase – R8',
+  '决赛阶段-四分之一决赛':'Final Phase – QF',
+  '决赛阶段-半决赛':'Final Phase – SF',
+  '决赛阶段-决赛':'Final Phase – Final',
+  '四分之一晋级赛':'Qual. to Quarterfinals',
+  '1/8决赛':'Round of 16','四分之一决赛':'Quarterfinal','1/4决赛':'Quarterfinal',
+  '¼决赛':'Quarterfinal',
+  '半决赛':'Semifinal','季军赛':'Bronze Final','铜牌赛':'Bronze Final',
+  '铜牌决赛':'Bronze Final','金牌赛':'Gold Final','决赛':'Final','总决赛':'Grand Final',
+  '淘汰赛':'Elimination','复活赛':'Repechage','表演赛':'Exhibition',
+  // Relay
+  '接力赛':'Relay Race','接力':'Relay',
+  // Combined / All-Around
+  '十项全能':'Decathlon','五项全能':'Pentathlon','七项全能':'Heptathlon','全能':'All-Around',
+  // Swimming strokes
+  '个人混合泳':'Individual Medley','混合泳':'Medley',
+  '自由泳':'Freestyle','自由式':'Freestyle',
+  '蛙泳':'Breaststroke','蝶泳':'Butterfly','仰泳':'Backstroke',
+  // Wrestling styles
+  '古典式':'Greco-Roman',
+  // Athletics field events
+  '三级跳远':'Triple Jump','三级跳':'Triple Jump',
+  '跳远':'Long Jump','跳高':'High Jump',
+  '铅球':'Shot Put','标枪':'Javelin','铁饼':'Discus','链球':'Hammer','撑竿跳':'Pole Vault',
+  '跨栏':'Hurdles','竞走':'Race Walk','马拉松':'Marathon',
+  // Dragon boat / rowing race types
+  '直道竞速':'Sprint Race','短距离':'Short Distance','长距离':'Long Distance',
+  // Ranking / qualifying rounds
+  '排名赛':'Ranking Round','晋级赛':'Qualifying Round',
+  // Climbing disciplines
+  '速度预赛':'Speed Qualification','速度决赛':'Speed Final',
+  '速度接力预赛':'Speed Relay Qual.','速度接力决赛':'Speed Relay Final',
+  '难度预赛':'Lead Qualification','难度决赛':'Lead Final',
+  '抱石预赛':'Boulder Qualification','抱石决赛':'Boulder Final',
+  '难度':'Lead','抱石':'Boulder',
+  // Place finals
+  '3/4名':'3rd Place','5/6名':'5th Place','7/8名':'7th Place',
+  '5/8名':'5th–8th Place',
+  // Gender / category prefixes
+  '男子':'Men\'s ','女子':'Women\'s ','混合':'Mixed ','混双':'Mixed Doubles',
+  '个人':'Individual','团体':'Team','双人':'Pairs',
+  '单打':'Singles','双打':'Doubles','男单':'Men\'s Singles','女单':'Women\'s Singles',
+  '男双':'Men\'s Doubles','女双':'Women\'s Doubles',
+  '男团':'Men\'s Team','女团':'Women\'s Team',
+  // Ceremonies
+  '开幕式':'Opening Ceremony','闭幕式':'Closing Ceremony','颁奖典礼':'Medal Ceremony',
+  '颁奖仪式':'Victory Ceremony','开赛仪式':'Opening Ceremony',
+  // Common suffixes / qualifiers
+  '胜者':'Winner','败者':'Loser','空':'Bye',
+  '男子组':'Men\'s','女子组':'Women\'s',
+  '男子小组赛':'Men\'s Group Stage','女子小组赛':'Women\'s Group Stage',
+  '男子决赛轮':'Men\'s Final Round','女子决赛轮':'Women\'s Final Round',
+  '男子半决赛':'Men\'s Semifinal','女子半决赛':'Women\'s Semifinal',
+  '男子铜牌赛':'Men\'s Bronze','女子铜牌赛':'Women\'s Bronze',
+  '男子金牌赛':'Men\'s Gold Final','女子金牌赛':'Women\'s Gold Final',
+  '待确认':'TBC','待定':'TBD','全天':'All Day',
+  '抽签':'Draw','开赛仪式':'Opening Ceremony','颁奖仪式':'Victory Ceremony',
+};
+// Combined sorted by length descending for greedy replacement
+const _ALL_TERMS=Object.entries({...VENUE_EN,...TERM_EN}).sort((a,b)=>b[0].length-a[0].length);
+
+// Regex-based patterns that can't be covered by a static dict
+function _applyRegex(s){
+  s=s.replace(/([A-Za-z])组第(\d+)/g,'Pool $1 Rank $2'); // A组第一 → Pool A Rank 1
+  s=s.replace(/([A-Za-z])组/g,'Group $1');               // A组 → Group A
+  s=s.replace(/第(\d+)轮/g,'Round $1');                  // 第3轮 → Round 3
+  s=s.replace(/(\d+)公里/g,'$1km');                      // 5公里 → 5km
+  s=s.replace(/(\d+)公斤/g,'$1kg');                      // 52公斤 → 52kg
+  s=s.replace(/\+(\d+)公斤/g,'+$1kg');                   // +90公斤 → +90kg
+  s=s.replace(/(\d+)米/g,'$1m');                         // 100米 → 100m
+  s=s.replace(/(\d+)人制/g,'$1-player ');                // 12人制 → 12-player
+  s=s.replace(/(\d+)\*(\d+)/g,'$1×$2');                  // 4*1.5 → 4×1.5
+  s=s.replace(/(\d+)强/g,'Top $1');                       // 8强 → Top 8, 16强 → Top 16
+  s=s.replace(/第(\d+)名/g,(_,n)=>{const i=parseInt(n);const sfx=i===1?'st':i===2?'nd':i===3?'rd':'th';return `${i}${sfx} Place`;});  // 第3名 → 3rd Place
+  // Strip leftover bilingual slash separators like 男/M or 女/Women
+  s=s.replace(/[\u4e00-\u9fff]+\/([A-Za-z\s]+)/g,'$1'); // CN/EN → EN
+  s=s.replace(/^([A-Za-z\s]+)\/[\u4e00-\u9fff]+$/g,'$1'); // EN/CN → EN
+  return s.trim();
+}
+
+function _translateStr(str){
+  let s=str;
+  for(const[cn,en] of _ALL_TERMS) s=s.replace(new RegExp(cn.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'g'),en);
+  return _applyRegex(s);
+}
+
+function getVenueName(v){
+  if(isZh) return v.short_name||v.name;
+  return _translateStr(v.short_name||v.name);
+}
+function getVenueSubName(v){
+  if(isZh) return v.name;
+  return _translateStr(v.name);
+}
+function getRoundName(r){
+  if(isZh||!r) return r||'';
+  if(TERM_EN[r]) return TERM_EN[r];
+  return _translateStr(r);
+}
+function getEventName(name){
+  if(!name) return '';
+  // Bilingual format "中文\nEnglish" — pick the right half directly
+  if(name.includes('\n')){
+    const [cn,en]=name.split('\n');
+    return isZh?(cn||name):(en||name);
+  }
+  if(isZh) return name;
+  return _translateStr(name);
+}
+
+function toggleLang(){
+  isZh=!isZh;
+  // Header actions
+  document.getElementById('langBtn').textContent=isZh?'中':'EN';
+  document.getElementById('adminLbl').textContent=isZh?'管理后台':'Admin';
+  document.getElementById('syncLbl').textContent=isZh?'当地时间':'Local Time';
+  document.getElementById('appTitle').textContent=isZh?'亚沙会智慧转播赛程管理系统':'ABG Broadcast Schedule System';
+  document.getElementById('appSub').textContent=isZh?'Asian Beach Games · Broadcast Management':'Asian Beach Games · Broadcast Management';
+  // Theme bar
+  document.querySelector('.tbar-lbl').textContent=isZh?'风格':'Theme';
+  document.querySelector('[data-t="cyberpunk"]').lastChild.textContent=isZh?'赛博朋克':'Cyberpunk';
+  document.querySelector('[data-t="beach"]').lastChild.textContent=isZh?'沙滩椰林':'Beach';
+  document.querySelector('[data-t="fashion"]').lastChild.textContent=isZh?'现代时尚':'Fashion';
+  document.querySelector('[data-t="chinese"]').lastChild.textContent=isZh?'马年中国风':'Chinese';
+  document.querySelector('[data-t="fresh"]').lastChild.textContent=isZh?'清新':'Fresh';
+  // DB status
+  const dbLbl=document.getElementById('dbLbl');
+  if(dbLbl.textContent.includes('实时')||dbLbl.textContent.includes('Realtime')) dbLbl.textContent=isZh?'实时同步':'Realtime';
+  else if(dbLbl.textContent.includes('连接中')||dbLbl.textContent.includes('Connecting')) dbLbl.textContent=isZh?'连接中…':'Connecting…';
+  else if(dbLbl.textContent.includes('失败')||dbLbl.textContent.includes('Error')) dbLbl.textContent=isZh?'连接失败':'Error';
+  // Toolbar
+  document.querySelectorAll('.tbl').forEach((lbl,i)=>{
+    if(i===0) lbl.textContent=isZh?'时间范围':'Range';
+    else if(i===1) lbl.textContent=isZh?'缩放':'Zoom';
+  });
+  document.querySelector('[data-r="1h"]').textContent=isZh?'1小时':'1H';
+  document.querySelector('.brng[data-r="1d"]').textContent=isZh?'1天':'1D';
+  document.querySelector('[data-r="games"]').textContent=isZh?'本赛事':'Full Games';
+  // "回到当前" button text
+  const nowBtn=document.querySelector('.bnow');
+  nowBtn.childNodes[nowBtn.childNodes.length-1].textContent=isZh?'回到当前':'Now';
+  // Filter buttons
+  document.querySelector('.bseg[data-f="all"]').textContent=isZh?'全部':'All';
+  document.querySelector('.bseg[data-f="live"]').textContent=isZh?'直播中':'Live';
+  document.querySelector('.bseg[data-f="upcoming"]').textContent=isZh?'即将':'Soon';
+  // Round bar label
+  const rbl=document.querySelector('.rbl');
+  if(rbl){
+    const svg=rbl.querySelector('svg').outerHTML;
+    rbl.innerHTML=svg+(isZh?'赛次':'Round');
+  }
+  document.querySelector('.brd[data-r="all"]').textContent=isZh?'全部':'All';
+  // Venue panel header
+  document.querySelector('.vphl').textContent=isZh?'场馆/项目':'Venues';
+  // Status bar
+  const sis=document.querySelectorAll('.si');
+  if(sis[0]) sis[0].querySelector('span:first-child').textContent=isZh?'赛事':'Events';
+  if(sis[1]){const s=sis[1].querySelectorAll('span');if(s[0])s[0].textContent=isZh?'直播中':'Live';}
+  if(sis[2]){const s=sis[2].querySelectorAll('span');if(s[0])s[0].textContent=isZh?'即将':'Soon';}
+  if(sis[3]){const s=sis[3].querySelectorAll('span');if(s[0])s[0].textContent=isZh?'已完成':'Done';}
+  // Legend
+  const legs=document.querySelectorAll('.leg span');
+  if(legs[0]) legs[0].textContent=isZh?'直播':'Live';
+  if(legs[1]) legs[1].textContent=isZh?'即将':'Soon';
+  if(legs[2]) legs[2].textContent=isZh?'完成':'Done';
+  // Empty state
+  document.getElementById('emptyTxt').textContent=isZh?'此日期暂无赛事':'No events for this date';
+  render();
+}
+function setTheme(t,btn){
+  document.documentElement.setAttribute('data-theme',t);
+  document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b===btn));
+  try{localStorage.setItem('lc-theme',t);}catch(_){}
+}
+
+/* ═══════════════════════════════════════════════
+   TOOLTIP
+═══════════════════════════════════════════════ */
+const TT=document.getElementById('tt');
+let lastE=null;
+function showTT(e,v,ev,st){
+  lastE=e;
+  const sl={live:'🔴 直播中',upcoming:'🟡 即将开始',finished:'⚫ 已完成'};
+  const slEn={live:'🔴 Live',upcoming:'🟡 Upcoming',finished:'⚫ Finished'};
+  const dur=Math.round((ev.end_time-ev.start_time)/60000);
+  document.getElementById('ttt').textContent=(ev.is_medal_event?'🥇 ':'')+(isZh?ev.name:getEventName(ev.name));
+  document.getElementById('ttb').innerHTML=`
+    <div class="tt-row"><span>${isZh?'场馆':'Venue'}</span><span class="tt-val">${getVenueName(v)}</span></div>
+    <div class="tt-row"><span>${isZh?'赛次':'Round'}</span><span class="tt-val">${getRoundName(ev.round)}</span></div>
+    <div class="tt-row"><span>${isZh?'开始':'Start'}</span><span class="tt-val">${fmtTs(ev.start_time)}</span></div>
+    <div class="tt-row"><span>${isZh?'结束':'End'}</span><span class="tt-val">${fmtTs(ev.end_time)}</span></div>
+    <div class="tt-row"><span>${isZh?'时长':'Duration'}</span><span class="tt-val">${dur}${isZh?'分钟':'min'}</span></div>
+    <div class="tt-row"><span>${isZh?'状态':'Status'}</span><span class="tt-val">${isZh?sl[st]:slEn[st]}</span></div>
+    ${ev.broadcast_channel?`<div class="tt-row"><span>${isZh?'频道':'Channel'}</span><span class="tt-val">${ev.broadcast_channel}</span></div>`:''}
+    ${ev.notes?`<div class="tt-row" style="margin-top:5px"><span style="color:var(--al)">${isZh?'备注':'Note'}</span><span class="tt-val" style="color:var(--al)">${ev.notes}</span></div>`:''}`;
+  TT.classList.add('show'); moveTT(e);
+}
+function moveTT(e){
+  const r=TT.getBoundingClientRect();
+  TT.style.left=Math.min(e.clientX+14,window.innerWidth-r.width-12)+'px';
+  TT.style.top=Math.max(10,Math.min(e.clientY-60,window.innerHeight-r.height-12))+'px';
+}
+function hideTT(){TT.classList.remove('show');}
+
+/* ═══════════════════════════════════════════════
+   LOADING / ERROR
+═══════════════════════════════════════════════ */
+function showLoading(show,txt=''){
+  const ov=document.getElementById('loading');
+  ov.classList.toggle('show',show);
+  if(txt) document.getElementById('loadTxt').textContent=txt;
+}
+function showErr(msg){
+  const b=document.getElementById('errBanner');
+  b.textContent=msg; b.style.display='block';
+  setTimeout(()=>b.style.display='none',5000);
+}
+
+/* ═══════════════════════════════════════════════
+   CALENDAR DATE PICKER
+═══════════════════════════════════════════════ */
+let calMonth=null, calYear=null, eventDates=new Set();
+
+async function fetchEventDates(){
+  try{
+    const {data}=await db.from('events').select('start_time');
+    if(data){
+      eventDates=new Set(data.map(e=>{
+        const d=new Date(e.start_time);
+        return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+      }));
+    }
+  }catch(_){}
+}
+
+function toggleCalendar(e){
+  e.stopPropagation();
+  const pop=document.getElementById('calPopup');
+  if(pop.classList.contains('show')){pop.classList.remove('show');return;}
+  // Position popup fixed relative to viewport below the date button
+  const rect=document.getElementById('dval').getBoundingClientRect();
+  const pw=248;
+  let left=rect.left+rect.width/2-pw/2;
+  left=Math.max(6,Math.min(left,window.innerWidth-pw-6));
+  pop.style.top=(rect.bottom+4)+'px';
+  pop.style.left=left+'px';
+  calMonth=viewDate.getMonth(); calYear=viewDate.getFullYear();
+  renderCalendar();
+  pop.classList.add('show');
+}
+
+function renderCalendar(){
+  const pop=document.getElementById('calPopup');
+  const today=new Date(); const td=`${today.getFullYear()}-${p2(today.getMonth()+1)}-${p2(today.getDate())}`;
+  const selD=`${viewDate.getFullYear()}-${p2(viewDate.getMonth()+1)}-${p2(viewDate.getDate())}`;
+  const dows=isZh?['一','二','三','四','五','六','日']:['Mo','Tu','We','Th','Fr','Sa','Su'];
+  const monNames=isZh
+    ?[`${calYear}年${calMonth+1}月`]
+    :['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const monLabel=isZh?`${calYear}年${calMonth+1}月`:`${monNames[calMonth]} ${calYear}`;
+
+  const firstDay=new Date(calYear,calMonth,1);
+  let startDow=(firstDay.getDay()+6)%7; // Mon=0
+  const daysInMonth=new Date(calYear,calMonth+1,0).getDate();
+  const prevMonthDays=new Date(calYear,calMonth,0).getDate();
+
+  let html=`<div class="cal-hdr"><button onclick="calNav(-1);event.stopPropagation()">‹</button><span>${monLabel}</span><button onclick="calNav(1);event.stopPropagation()">›</button></div>`;
+  html+=`<div class="cal-grid">`;
+  dows.forEach(d=>{html+=`<div class="cal-dow">${d}</div>`;});
+
+  // Previous month trailing days
+  for(let i=startDow-1;i>=0;i--){
+    const day=prevMonthDays-i;
+    html+=`<div class="cal-day other-month">${day}</div>`;
+  }
+  // Current month days
+  for(let d=1;d<=daysInMonth;d++){
+    const key=`${calYear}-${p2(calMonth+1)}-${p2(d)}`;
+    const cls=['cal-day'];
+    if(key===td) cls.push('today');
+    if(key===selD) cls.push('selected');
+    if(eventDates.has(key)) cls.push('has-events');
+    html+=`<div class="${cls.join(' ')}" onclick="pickDate(${calYear},${calMonth},${d})">${d}</div>`;
+  }
+  // Fill remaining cells
+  const totalCells=startDow+daysInMonth;
+  const remaining=(7-totalCells%7)%7;
+  for(let d=1;d<=remaining;d++){
+    html+=`<div class="cal-day other-month">${d}</div>`;
+  }
+  html+=`</div>`;
+  pop.innerHTML=html;
+}
+
+function calNav(dir){
+  calMonth+=dir;
+  if(calMonth>11){calMonth=0;calYear++;}
+  if(calMonth<0){calMonth=11;calYear--;}
+  renderCalendar();
+}
+
+function pickDate(y,m,d){
+  const target=new Date(y,m,d,12,0,0); // noon of picked date
+  const gs=document.getElementById('gs');
+  const gsW=gs.clientWidth||800;
+  document.getElementById('calPopup').classList.remove('show');
+
+  // Set viewDate BEFORE expanding grid / setting scroll, so getActiveVenues()
+  // uses the correct date when renderVenues() is called below.
+  viewDate=target;
+  const dk=`${y}-${p2(m+1)}-${p2(d)}`;
+  document.getElementById('dval').textContent=`${y}/${p2(m+1)}/${p2(d)}`;
+
+  // Use INSTANT scroll (not smooth). Smooth scroll fires dozens of scroll events
+  // each of which calls syncViewDate(), temporarily corrupting viewDate and making
+  // subsequent shiftDay() calls compute the wrong target date.
+  const gw=gridW();
+  document.getElementById('gi').style.width=gw+'px'; // expand first so scrollLeft isn't clamped
+  const x=tsToX(target.getTime());
+  gs.scrollLeft=Math.max(0,Math.min(x-gsW/2, Math.max(0,gw-gsW)));
+
+  if(_rangeMode!=='games'&&dk!==_activeDateKey){
+    _activeDateKey=dk;
+    renderVenues();
+    renderRows(gw);
+    moveNow();
+  }
+}
+
+// Close calendar on outside click
+document.addEventListener('click',e=>{
+  const pop=document.getElementById('calPopup');
+  if(pop&&!pop.contains(e.target)&&e.target.id!=='dval') pop.classList.remove('show');
+});
+
+/* ═══════════════════════════════════════════════
+   PINCH ZOOM
+═══════════════════════════════════════════════ */
+const GS=document.getElementById('gs');
+let PT={p:false,d:0,p0:PPM};
+function ptD(e){const dx=e.touches[0].clientX-e.touches[1].clientX,dy=e.touches[0].clientY-e.touches[1].clientY;return Math.hypot(dx,dy);}
+GS.addEventListener('touchstart',e=>{if(e.touches.length===2){e.preventDefault();PT={p:true,d:ptD(e),p0:PPM};}},{passive:false});
+GS.addEventListener('touchmove',e=>{if(e.touches.length===2&&PT.p){e.preventDefault();PPM=Math.max(PPM_MIN,Math.min(PPM_MAX,PT.p0*ptD(e)/PT.d));render();}},{passive:false});
+GS.addEventListener('touchend',()=>{if(!PT.p)return;PT.p=false;updateZL();});
+GS.addEventListener('scroll',()=>{document.getElementById('vlist').scrollTop=GS.scrollTop;updateDateLabel();});
+
+/* ═══════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded',async()=>{
+  // Restore saved theme preference
+  try{
+    const _t=localStorage.getItem('lc-theme');
+    if(_t){
+      document.documentElement.setAttribute('data-theme',_t);
+      document.querySelectorAll('.tbtn').forEach(b=>b.classList.toggle('active',b.dataset.t===_t));
+    }
+  }catch(_){}
+  dbStatus('connecting',isZh?'连接中…':'Connecting…');
+  showLoading(true,isZh?'连接数据库…':'Connecting…');
+  // Pre-fetch event dates for calendar (non-blocking)
+  fetchEventDates();
+  // Load all data — anchorTs is set inside loadData
+  await loadData();
+  setupRealtime();
+  requestAnimationFrame(tick);
+  // Set default zoom to 1-day view, scroll to NOW, compute visible venues
+  const gsEl=document.getElementById('gs');
+  const gsW=gsEl.clientWidth||800;
+  PPM=Math.max(PPM_MIN,Math.min(PPM_MAX, gsW/1440));
+  render();
+  // Always start at current time
+  setTimeout(()=>{
+    const x=tsToX(Date.now());
+    gsEl.scrollTo({left:Math.max(0,x-gsW/2),behavior:'auto'});
+    updateDateLabel();
+  },200);
+});
+window.addEventListener('resize',()=>render());
+
+/* ═══════════════════════════════════════════════
+   KEYBOARD SHORTCUTS  (broadcast quick-ops)
+   ← → : shift day   + - : zoom   T : jump to now
+═══════════════════════════════════════════════ */
+window.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'||e.target.tagName==='TEXTAREA') return;
+  if(e.key==='ArrowLeft'&&!e.metaKey&&!e.ctrlKey){e.preventDefault();shiftDay(-1);}
+  else if(e.key==='ArrowRight'&&!e.metaKey&&!e.ctrlKey){e.preventDefault();shiftDay(1);}
+  else if(e.key==='+'||e.key==='=') doZoom(1);
+  else if(e.key==='-'||e.key==='_') doZoom(-1);
+  else if(e.key==='t'||e.key==='T') scrollNow();
+});
+
+/* ═══════════════════════════════════════════════
+   FULLSCREEN / LANDSCAPE UTILS
+═══════════════════════════════════════════════ */
+function toggleFullscreen(){
+  const btn=document.getElementById('fsBtn');
+  if(!document.fullscreenElement&&!document.webkitFullscreenElement){
+    const el=document.documentElement;
+    (el.requestFullscreen||el.webkitRequestFullscreen||el.mozRequestFullScreen||el.msRequestFullscreen).call(el).catch(()=>{});
+  } else {
+    (document.exitFullscreen||document.webkitExitFullscreen||document.mozCancelFullScreen||document.msExitFullscreen).call(document);
+  }
+}
+function _onFsChange(){
+  const isFs=!!(document.fullscreenElement||document.webkitFullscreenElement);
+  const btn=document.getElementById('fsBtn');
+  if(btn){
+    btn.querySelector('.fs-enter').style.display=isFs?'none':'block';
+    btn.querySelector('.fs-exit').style.display=isFs?'block':'none';
+    btn.title=isFs?'退出全屏':'全屏';
+  }
+  // Re-render to recalculate widths after fullscreen change
+  setTimeout(()=>{render();scrollNow();},200);
+}
+document.addEventListener('fullscreenchange',_onFsChange);
+document.addEventListener('webkitfullscreenchange',_onFsChange);
+
+// Lock to landscape on mobile when fullscreen (Android Chrome supports this)
+function _tryLockOrientation(){
+  try{
+    if(screen.orientation&&screen.orientation.lock){
+      screen.orientation.lock('landscape').catch(()=>{});
+    }
+  }catch(_){}
+}
+document.addEventListener('fullscreenchange',()=>{
+  if(document.fullscreenElement) _tryLockOrientation();
+  else if(screen.orientation&&screen.orientation.unlock) screen.orientation.unlock();
+});
+
+/* cleanup realtime on page exit */
+window.addEventListener('pagehide',()=>{if(_rtCh){try{db.removeChannel(_rtCh);}catch(_){}}});
+</script>
+</body>
+</html>

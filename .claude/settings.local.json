@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s \"https://mdgfcgxtlxgzkvoiqonp.supabase.co/rest/v1/?apikey=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2ZjZ3h0bHhnemt2b2lxb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTcwMjIsImV4cCI6MjA4OTEzMzAyMn0.ds9Ab_HkRNsUDSUrTlfJ5NpmlywgWwotNei4YX3Oo-k\")",
+      "Bash(python3 -c \":*)",
+      "Bash(KEY=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2ZjZ3h0bHhnemt2b2lxb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTcwMjIsImV4cCI6MjA4OTEzMzAyMn0.ds9Ab_HkRNsUDSUrTlfJ5NpmlywgWwotNei4YX3Oo-k\" URL=\"https://mdgfcgxtlxgzkvoiqonp.supabase.co\" __NEW_LINE_c0e17da193c03de9__ echo \"=== VENUES ===\" curl -s \"$URL/rest/v1/venues?select=*&limit=20\" -H \"apikey: $KEY\" -H \"Authorization: Bearer $KEY\")",
+      "Bash(python3 -m json.tool)",
+      "Bash(echo '\\(empty or error\\)' __NEW_LINE_c0e17da193c03de9__ echo echo '=== EVENTS ===' curl -s \"$URL/rest/v1/events?select=*&limit=20\" -H 'apikey: $KEY' -H 'Authorization: Bearer $KEY')",
+      "Bash(python3:*)",
+      "Bash(node --check /Users/romandemac/Desktop/live-cue-themes.html)",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(grep -E \"''台克球''|''柔术''|''沙滩卡巴迪''|''游跑两项''|''沙滩田径''|''攀岩''\" /Users/romandemac/Desktop/live-cue-themes.html)",
+      "Bash(node --check /tmp/check_js.js)",
+      "Bash(ls /Users/romandemac/Desktop/*.xlsx /Users/romandemac/Desktop/*.csv /Users/romandemac/Desktop/*.json /Users/romandemac/Desktop/*.sql)",
+      "Read(//Users/romandemac/Desktop/**)",
+      "Bash(1:*)",
+      "Bash(open \"https://supabase.com/dashboard/project/mdgfcgxtlxgzkvoiqonp/auth/users\")"
+    ]
+  }
+}

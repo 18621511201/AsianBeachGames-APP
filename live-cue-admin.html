@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Live-CUE 管理后台</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bg:#0a0c14;--surf:#0f1220;--elev:#171a2e;--gl:rgba(255,255,255,.04);--b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.12);--acc:#3b82f6;--acl:#60a5fa;--ag:rgba(59,130,246,.35);--live:#ef4444;--up:#f59e0b;--ok:#10b981;--t1:#f1f5f9;--t2:#94a3b8;--t3:#475569;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;--r:8px}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--t1);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+/* ── LAYOUT ── */
+#shell{display:flex;height:100vh}
+/* ── SIDEBAR ── */
+.sidebar{width:220px;flex-shrink:0;background:var(--surf);border-right:1px solid var(--b1);display:flex;flex-direction:column}
+.slogo{padding:20px 18px;border-bottom:1px solid var(--b1)}
+.slogo-name{font-size:14px;font-weight:700;color:var(--t1)}
+.slogo-sub{font-size:10px;color:var(--t3);margin-top:2px;letter-spacing:.06em;text-transform:uppercase}
+.snav{flex:1;padding:12px 8px;display:flex;flex-direction:column;gap:2px;overflow-y:auto}
+.snav a{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:6px;font-size:13px;font-weight:500;color:var(--t2);text-decoration:none;transition:all .15s;cursor:pointer}
+.snav a:hover{background:var(--gl);color:var(--t1)}
+.snav a.active{background:rgba(59,130,246,.12);color:var(--acl);border:1px solid rgba(59,130,246,.2)}
+.snav a svg{flex-shrink:0;opacity:.7}
+.snav .sep{height:1px;background:var(--b1);margin:8px 2px}
+.suser{padding:14px 16px;border-top:1px solid var(--b1)}
+.suser-email{font-size:11px;color:var(--t3);margin-bottom:8px;font-family:var(--mono)}
+.suser-role{display:inline-block;padding:2px 8px;border-radius:99px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:rgba(59,130,246,.15);color:var(--acl);border:1px solid rgba(59,130,246,.25);margin-bottom:8px}
+.btn-logout{width:100%;padding:7px;border-radius:6px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;font-family:var(--sans)}
+.btn-logout:hover{background:rgba(239,68,68,.2)}
+
+/* ── MAIN ── */
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{height:52px;background:var(--surf);border-bottom:1px solid var(--b1);display:flex;align-items:center;padding:0 24px;gap:12px;flex-shrink:0}
+.topbar-title{font-size:15px;font-weight:600;color:var(--t1)}
+.topbar-sub{font-size:12px;color:var(--t3);margin-left:4px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+.content{flex:1;overflow-y:auto;padding:24px;scrollbar-width:thin;scrollbar-color:var(--b1) transparent}
+/* ── CARDS ── */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--surf);border:1px solid var(--b1);border-radius:var(--r);padding:16px;transition:border-color .15s}
+.stat-card:hover{border-color:var(--b2)}
+.sc-label{font-size:10px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+.sc-num{font-size:28px;font-weight:700;font-family:var(--mono);color:var(--t1);line-height:1}
+.sc-sub{font-size:11px;color:var(--t3);margin-top:4px}
+/* ── TABLE ── */
+.section{background:var(--surf);border:1px solid var(--b1);border-radius:var(--r);overflow:hidden;margin-bottom:20px}
+.sec-head{display:flex;align-items:center;padding:14px 20px;border-bottom:1px solid var(--b1);gap:10px}
+.sec-title{font-size:13px;font-weight:600;color:var(--t1)}
+.sec-cnt{font-size:10px;font-family:var(--mono);color:var(--t3);background:var(--gl);padding:2px 8px;border-radius:99px;border:1px solid var(--b1)}
+.sec-actions{margin-left:auto;display:flex;gap:8px}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{padding:9px 16px;text-align:left;font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--b1);white-space:nowrap;background:rgba(255,255,255,.01)}
+td{padding:10px 16px;border-bottom:1px solid var(--b1);color:var(--t2);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:var(--gl)}
+.mono{font-family:var(--mono);font-size:11px}
+/* ── BADGES ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;border-radius:99px;font-size:10px;font-weight:600;letter-spacing:.04em;white-space:nowrap}
+.badge.live{background:rgba(239,68,68,.12);color:#f87171;border:1px solid rgba(239,68,68,.25)}
+.badge.up{background:rgba(245,158,11,.12);color:#fbbf24;border:1px solid rgba(245,158,11,.25)}
+.badge.done{background:rgba(71,85,105,.15);color:#94a3b8;border:1px solid rgba(71,85,105,.25)}
+.badge.sched{background:rgba(59,130,246,.12);color:#60a5fa;border:1px solid rgba(59,130,246,.25)}
+.badge.medal{background:rgba(251,191,36,.12);color:#fbbf24;border:1px solid rgba(251,191,36,.25)}
+.dot{width:6px;height:6px;border-radius:50%;display:inline-block}
+.dot.live{background:#ef4444;box-shadow:0 0 4px #ef4444;animation:pulse 1.5s ease infinite}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.5);opacity:.6}}
+/* ── BUTTONS ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;transition:all .18s;border:1px solid;font-family:var(--sans);white-space:nowrap}
+.btn-primary{background:rgba(59,130,246,.15);border-color:rgba(59,130,246,.3);color:var(--acl)}
+.btn-primary:hover{background:rgba(59,130,246,.25);border-color:rgba(59,130,246,.5);box-shadow:0 0 12px var(--ag)}
+.btn-ghost{background:var(--gl);border-color:var(--b1);color:var(--t2)}
+.btn-ghost:hover{background:var(--b1);color:var(--t1)}
+.btn-danger{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.25);color:#f87171}
+.btn-danger:hover{background:rgba(239,68,68,.2)}
+.btn-sm{padding:4px 10px;font-size:11px}
+/* ── MODAL ── */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-bg.show{opacity:1;pointer-events:all}
+.modal{background:var(--elev);border:1px solid var(--b2);border-radius:12px;padding:24px;width:min(540px,95vw);max-height:90vh;overflow-y:auto;transform:translateY(10px);transition:transform .2s}
+.modal-bg.show .modal{transform:translateY(0)}
+.modal-title{font-size:16px;font-weight:700;color:var(--t1);margin-bottom:20px}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:11px;font-weight:600;color:var(--t3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.field input,.field select,.field textarea{width:100%;padding:9px 12px;background:var(--surf);border:1px solid var(--b2);border-radius:6px;color:var(--t1);font-size:13px;font-family:var(--sans);transition:border-color .15s;outline:none}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--acc);box-shadow:0 0 0 2px rgba(59,130,246,.15)}
+.field input::placeholder,.field textarea::placeholder{color:var(--t3)}
+.field select option{background:var(--elev)}
+.field textarea{resize:vertical;min-height:80px}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.modal-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px;padding-top:16px;border-top:1px solid var(--b1)}
+/* ── LOGIN ── */
+#loginPage{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:200}
+.login-box{background:var(--surf);border:1px solid var(--b1);border-radius:12px;padding:32px;width:360px}
+.login-logo{font-size:24px;margin-bottom:4px}
+.login-title{font-size:18px;font-weight:700;color:var(--t1);margin-bottom:4px}
+.login-sub{font-size:12px;color:var(--t3);margin-bottom:24px}
+.login-err{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:#f87171;border-radius:6px;padding:8px 12px;font-size:12px;margin-bottom:12px;display:none}
+.btn-block{width:100%;padding:10px;border-radius:6px;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.3);color:var(--acl);font-size:14px;font-weight:600;cursor:pointer;transition:all .2s;font-family:var(--sans);margin-top:4px}
+.btn-block:hover{background:rgba(59,130,246,.25);box-shadow:0 0 16px var(--ag)}
+/* ── IMPORT ── */
+.drop-zone{border:2px dashed var(--b2);border-radius:var(--r);padding:40px;text-align:center;cursor:pointer;transition:all .2s}
+.drop-zone:hover,.drop-zone.drag{border-color:var(--acc);background:rgba(59,130,246,.05)}
+.drop-icon{font-size:36px;margin-bottom:12px}
+.drop-txt{font-size:14px;color:var(--t2);margin-bottom:4px}
+.drop-sub{font-size:11px;color:var(--t3)}
+/* ── AUDIT ── */
+.log-row{display:flex;gap:12px;padding:10px 16px;border-bottom:1px solid var(--b1);align-items:flex-start}
+.log-row:last-child{border-bottom:none}
+.log-icon{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.log-icon.create{background:rgba(16,185,129,.15);color:#10b981}
+.log-icon.update{background:rgba(59,130,246,.15);color:#60a5fa}
+.log-icon.delete{background:rgba(239,68,68,.15);color:#f87171}
+.log-icon.import{background:rgba(245,158,11,.15);color:#fbbf24}
+.log-icon.login{background:rgba(139,92,246,.15);color:#a78bfa}
+.log-body{flex:1;min-width:0}
+.log-action{font-size:12px;font-weight:600;color:var(--t1)}
+.log-meta{font-size:10px;color:var(--t3);margin-top:2px;font-family:var(--mono)}
+/* ── LOADING ── */
+.sk{background:linear-gradient(90deg,var(--gl) 25%,var(--b1) 50%,var(--gl) 75%);background-size:200% 100%;animation:sk 1.5s ease infinite;border-radius:4px}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
+/* ── RESPONSIVE ── */
+@media(max-width:768px){.sidebar{display:none}.stat-grid{grid-template-columns:1fr 1fr}.field-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ LOGIN PAGE ═══════════════ -->
+<div id="loginPage">
+  <div class="login-box">
+    <div class="login-logo">🏖️</div>
+    <div class="login-title">Live-CUE 管理后台</div>
+    <div class="login-sub">亚沙会智慧转播赛程管理系统</div>
+    <div class="login-err" id="loginErr"></div>
+    <div class="field">
+      <label>邮箱</label>
+      <input type="email" id="loginEmail" placeholder="admin@example.com" autocomplete="email">
+    </div>
+    <div class="field">
+      <label>密码</label>
+      <input type="password" id="loginPwd" placeholder="••••••••" autocomplete="current-password">
+    </div>
+    <button class="btn-block" id="loginBtn" onclick="doLogin()">登 录</button>
+    <p style="text-align:center;margin-top:14px;font-size:11px;color:var(--t3)">
+      首次使用？请先在 Supabase Authentication 中创建账号
+    </p>
+  </div>
+</div>
+
+<!-- ═══════════════ MAIN SHELL ═══════════════ -->
+<div id="shell" style="display:none">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="slogo">
+      <div class="slogo-name">Live-CUE Admin</div>
+      <div class="slogo-sub">亚沙会转播管理</div>
+    </div>
+    <nav class="snav" id="nav">
+      <a onclick="show('dashboard')" class="active" data-p="dashboard">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>仪表盘
+      </a>
+      <a onclick="show('events')" data-p="events">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>赛事管理
+      </a>
+      <a onclick="show('venues')" data-p="venues">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>场馆管理
+      </a>
+      <div class="sep"></div>
+      <a onclick="show('import')" data-p="import">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入数据
+      </a>
+      <a onclick="show('audit')" data-p="audit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>操作日志
+      </a>
+      <a onclick="show('export')" data-p="export">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出报表
+      </a>
+      <div class="sep"></div>
+      <a href="live-cue-themes.html">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 8 8 12 12 16"/><line x1="16" y1="12" x2="8" y2="12"/></svg>← 返回大屏
+      </a>
+    </nav>
+    <div class="suser">
+      <div class="suser-email" id="userEmail">—</div>
+      <div class="suser-role" id="userRole">viewer</div><br>
+      <button class="btn-logout" onclick="doLogout()">退出登录</button>
+    </div>
+    <div style="padding:10px 16px;border-top:1px solid var(--b1);text-align:center">
+      <span style="font-size:10px;color:var(--t3);letter-spacing:.04em">Powered by <span style="color:var(--acl);font-weight:600">Roman Ling</span></span>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="main">
+    <div class="topbar">
+      <span class="topbar-title" id="pageTitle">仪表盘</span>
+      <span class="topbar-sub" id="pageSub"></span>
+      <div class="topbar-right" id="pageActions"></div>
+    </div>
+    <div class="content" id="content">
+      <div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ EVENT MODAL ═══ -->
+<div class="modal-bg" id="evtModal">
+  <div class="modal">
+    <div class="modal-title" id="evtModalTitle">添加赛事</div>
+    <input type="hidden" id="evtId">
+    <div class="field">
+      <label>赛事名称</label>
+      <input type="text" id="evtName" placeholder="e.g. W 女 A 组预赛">
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>场馆</label>
+        <select id="evtVenue"></select>
+      </div>
+      <div class="field">
+        <label>赛次</label>
+        <select id="evtRound">
+          <option>预赛</option><option>半决赛</option><option>决赛</option><option>其他</option>
+        </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>开始时间</label>
+        <input type="datetime-local" id="evtStart">
+      </div>
+      <div class="field">
+        <label>结束时间</label>
+        <input type="datetime-local" id="evtEnd">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>转播频道</label>
+        <input type="text" id="evtCh" placeholder="e.g. CCTV-5">
+      </div>
+      <div class="field">
+        <label>状态</label>
+        <select id="evtStatus">
+          <option value="scheduled">计划中</option>
+          <option value="live">直播中</option>
+          <option value="finished">已完成</option>
+          <option value="cancelled">已取消</option>
+        </select>
+      </div>
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:10px">
+      <input type="checkbox" id="evtMedal" style="width:auto">
+      <label for="evtMedal" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--t1);margin:0">🥇 金牌赛事</label>
+    </div>
+    <div class="field">
+      <label>备注</label>
+      <textarea id="evtNotes" placeholder="内部备注，不对外显示…"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('evtModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveEvent()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ VENUE MODAL ═══ -->
+<div class="modal-bg" id="venueModal">
+  <div class="modal">
+    <div class="modal-title" id="venueModalTitle">编辑场馆</div>
+    <input type="hidden" id="venueId">
+    <div class="field-row">
+      <div class="field">
+        <label>场馆全称</label>
+        <input type="text" id="venueName" placeholder="帆船赛场">
+      </div>
+      <div class="field">
+        <label>简称</label>
+        <input type="text" id="venueShort" placeholder="帆船">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>运动项目</label>
+        <input type="text" id="venueSport" placeholder="帆船">
+      </div>
+      <div class="field">
+        <label>标识颜色</label>
+        <input type="color" id="venueColor" value="#3b82f6">
+      </div>
+    </div>
+    <div class="field">
+      <label>位置</label>
+      <input type="text" id="venueLocation" placeholder="三亚">
+    </div>
+    <div class="field" style="display:flex;align-items:center;gap:10px">
+      <input type="checkbox" id="venueActive" style="width:auto" checked>
+      <label for="venueActive" style="text-transform:none;letter-spacing:0;font-size:13px;color:var(--t1);margin:0">场馆启用</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('venueModal')">取消</button>
+      <button class="btn btn-primary" onclick="saveVenue()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ── SUPABASE ── */
+const SB_URL='https://mdgfcgxtlxgzkvoiqonp.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2ZjZ3h0bHhnemt2b2lxb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTcwMjIsImV4cCI6MjA4OTEzMzAyMn0.ds9Ab_HkRNsUDSUrTlfJ5NpmlywgWwotNei4YX3Oo-k';
+const {createClient}=supabase;
+const db=createClient(SB_URL,SB_KEY);
+
+let CUR_USER=null,CUR_ROLE='viewer';
+let VENUES=[],EVENTS=[],LOGS=[];
+
+/* ── AUTH ── */
+async function checkAuth(){
+  const {data:{session}}=await db.auth.getSession();
+  if(session){
+    CUR_USER=session.user;
+    await loadProfile();
+    showApp();
+  }
+}
+async function loadProfile(){
+  const {data}=await db.from('profiles').select('role,full_name').eq('id',CUR_USER.id).single();
+  if(data){CUR_ROLE=data.role;}
+  document.getElementById('userEmail').textContent=CUR_USER.email;
+  document.getElementById('userRole').textContent=CUR_ROLE;
+}
+async function doLogin(){
+  const btn=document.getElementById('loginBtn');
+  btn.textContent='登录中…'; btn.disabled=true;
+  const email=document.getElementById('loginEmail').value;
+  const pwd=document.getElementById('loginPwd').value;
+  const {error}=await db.auth.signInWithPassword({email,password:pwd});
+  btn.textContent='登 录'; btn.disabled=false;
+  if(error){
+    const el=document.getElementById('loginErr');
+    el.textContent=error.message; el.style.display='block';
+  } else {
+    const {data:{session}}=await db.auth.getSession();
+    CUR_USER=session.user;
+    await loadProfile();
+    showApp();
+  }
+}
+async function doLogout(){
+  await db.auth.signOut();
+  location.reload();
+}
+function showApp(){
+  document.getElementById('loginPage').style.display='none';
+  document.getElementById('shell').style.display='flex';
+  show('dashboard');
+}
+document.getElementById('loginPwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
+
+/* ── NAVIGATION ── */
+async function show(page){
+  document.querySelectorAll('#nav a[data-p]').forEach(a=>a.classList.toggle('active',a.dataset.p===page));
+  const titles={dashboard:'仪表盘',events:'赛事管理',venues:'场馆管理',import:'导入数据',audit:'操作日志',export:'导出报表'};
+  document.getElementById('pageTitle').textContent=titles[page]||page;
+  document.getElementById('pageActions').innerHTML='';
+  document.getElementById('pageSub').textContent='';
+  if(page==='dashboard') await renderDashboard();
+  else if(page==='events') await renderEvents();
+  else if(page==='venues') await renderVenues();
+  else if(page==='import') renderImport();
+  else if(page==='audit') await renderAudit();
+  else if(page==='export') await renderExport();
+}
+
+/* ── DASHBOARD ── */
+async function renderDashboard(){
+  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
+  const [{data:ev},{data:vn}]=await Promise.all([
+    db.from('events').select('status,is_medal_event'),
+    db.from('venues').select('id,is_active')
+  ]);
+  const now=Date.now();
+  const live=(ev||[]).filter(e=>e.status==='live').length;
+  const sched=(ev||[]).filter(e=>e.status==='scheduled').length;
+  const medal=(ev||[]).filter(e=>e.is_medal_event).length;
+  const active=(vn||[]).filter(v=>v.is_active).length;
+  document.getElementById('content').innerHTML=`
+    <div class="stat-grid">
+      <div class="stat-card"><div class="sc-label">赛事总数</div><div class="sc-num">${(ev||[]).length}</div><div class="sc-sub">全部赛程单元</div></div>
+      <div class="stat-card" style="border-color:rgba(239,68,68,.25)"><div class="sc-label" style="color:#f87171">直播中</div><div class="sc-num" style="color:#ef4444">${live}</div><div class="sc-sub">正在转播</div></div>
+      <div class="stat-card"><div class="sc-label">待播</div><div class="sc-num">${sched}</div><div class="sc-sub">已排期</div></div>
+      <div class="stat-card" style="border-color:rgba(251,191,36,.2)"><div class="sc-label" style="color:#fbbf24">金牌赛事</div><div class="sc-num" style="color:#f59e0b">${medal}</div><div class="sc-sub">🥇 决赛/颁奖</div></div>
+      <div class="stat-card"><div class="sc-label">启用场馆</div><div class="sc-num">${active}</div><div class="sc-sub">共 ${(vn||[]).length} 个</div></div>
+    </div>
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-title">最近赛事</span>
+        <div class="sec-actions"><button class="btn btn-primary btn-sm" onclick="show('events')">查看全部 →</button></div>
+      </div>
+      <div id="dashEvts"><div style="padding:20px;text-align:center;color:var(--t3)">加载中…</div></div>
+    </div>`;
+  // Recent events
+  const {data:rec}=await db.from('events').select('*').order('start_time').limit(10);
+  if(!rec||!rec.length){document.getElementById('dashEvts').innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">暂无赛事数据</div>';return;}
+  await loadVenueMap();
+  document.getElementById('dashEvts').innerHTML=`<div class="table-wrap"><table>
+    <tr><th>赛事</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>状态</th></tr>
+    ${rec.map(e=>`<tr>
+      <td style="color:var(--t1);font-weight:500">${e.is_medal_event?'🥇 ':''}${e.name}</td>
+      <td>${VENUES.find(v=>v.id===e.venue_id)?.short_name||'—'}</td>
+      <td><span class="badge ${e.round==='决赛'?'medal':''}">${e.round}</span></td>
+      <td class="mono">${fmtDT(e.start_time)}</td>
+      <td class="mono">${fmtDT(e.end_time)}</td>
+      <td>${statusBadge(e.status)}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+
+/* ── EVENTS ── */
+async function renderEvents(){
+  document.getElementById('pageActions').innerHTML=`<button class="btn btn-primary" onclick="openEvtModal()">＋ 添加赛事</button>`;
+  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
+  await loadVenueMap();
+  const {data:ev}=await db.from('events').select('*').order('start_time');
+  EVENTS=ev||[];
+  document.getElementById('pageSub').textContent=`共 ${EVENTS.length} 条`;
+  renderEvtTable();
+}
+function renderEvtTable(){
+  document.getElementById('content').innerHTML=`
+    <div class="section">
+      <div class="sec-head">
+        <span class="sec-title">赛事列表</span>
+        <span class="sec-cnt">${EVENTS.length}</span>
+        <div class="sec-actions">
+          <input type="text" id="evtSearch" placeholder="搜索赛事名称…" oninput="filterEvts(this.value)"
+            style="padding:5px 10px;background:var(--gl);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-size:12px;font-family:var(--sans);outline:none;width:180px">
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table id="evtTbl">
+          <tr><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th><th>金牌</th><th>频道</th><th>操作</th></tr>
+          ${evtRows(EVENTS)}
+        </table>
+      </div>
+    </div>`;
+}
+function evtRows(evts){
+  if(!evts.length) return '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:30px">暂无数据</td></tr>';
+  return evts.map(e=>`<tr>
+    <td style="color:var(--t1);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name}</td>
+    <td>${VENUES.find(v=>v.id===e.venue_id)?.short_name||'—'}</td>
+    <td><span class="badge">${e.round}</span></td>
+    <td class="mono" style="font-size:10px">${fmtDT(e.start_time)}</td>
+    <td class="mono" style="font-size:10px">${fmtDT(e.end_time)}</td>
+    <td>${statusBadge(e.status)}</td>
+    <td style="text-align:center">${e.is_medal_event?'🥇':''}</td>
+    <td style="color:var(--t3);font-size:11px">${e.broadcast_channel||'—'}</td>
+    <td><div style="display:flex;gap:4px">
+      <button class="btn btn-ghost btn-sm" onclick='openEvtModal(${JSON.stringify(e).replace(/'/g,"&#39;")})'>编辑</button>
+      <button class="btn btn-danger btn-sm" onclick="delEvent('${e.id}')">删除</button>
+    </div></td>
+  </tr>`).join('');
+}
+function filterEvts(q){
+  const filtered=EVENTS.filter(e=>e.name.includes(q)||e.round.includes(q));
+  document.querySelector('#evtTbl').innerHTML=`<tr><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th><th>金牌</th><th>频道</th><th>操作</th></tr>${evtRows(filtered)}`;
+}
+
+/* ── EVENT MODAL ── */
+async function openEvtModal(ev){
+  await loadVenueMap();
+  const sel=document.getElementById('evtVenue');
+  sel.innerHTML=VENUES.map(v=>`<option value="${v.id}">${v.name}</option>`).join('');
+  if(ev){
+    document.getElementById('evtModalTitle').textContent='编辑赛事';
+    document.getElementById('evtId').value=ev.id;
+    document.getElementById('evtName').value=ev.name||'';
+    document.getElementById('evtVenue').value=ev.venue_id||'';
+    document.getElementById('evtRound').value=ev.round||'其他';
+    document.getElementById('evtStart').value=toLocalDT(ev.start_time);
+    document.getElementById('evtEnd').value=toLocalDT(ev.end_time);
+    document.getElementById('evtCh').value=ev.broadcast_channel||'';
+    document.getElementById('evtStatus').value=ev.status||'scheduled';
+    document.getElementById('evtMedal').checked=ev.is_medal_event||false;
+    document.getElementById('evtNotes').value=ev.notes||'';
+  } else {
+    document.getElementById('evtModalTitle').textContent='添加赛事';
+    document.getElementById('evtId').value='';
+    document.getElementById('evtName').value='';
+    document.getElementById('evtStart').value='';
+    document.getElementById('evtEnd').value='';
+    document.getElementById('evtCh').value='';
+    document.getElementById('evtNotes').value='';
+    document.getElementById('evtMedal').checked=false;
+  }
+  document.getElementById('evtModal').classList.add('show');
+}
+async function saveEvent(){
+  const id=document.getElementById('evtId').value;
+  const payload={
+    name:document.getElementById('evtName').value.trim(),
+    venue_id:document.getElementById('evtVenue').value,
+    round:document.getElementById('evtRound').value,
+    start_time:new Date(document.getElementById('evtStart').value).getTime(),
+    end_time:new Date(document.getElementById('evtEnd').value).getTime(),
+    broadcast_channel:document.getElementById('evtCh').value||null,
+    status:document.getElementById('evtStatus').value,
+    is_medal_event:document.getElementById('evtMedal').checked,
+    notes:document.getElementById('evtNotes').value||null,
+  };
+  if(!payload.name||!payload.venue_id){alert('请填写赛事名称和场馆');return;}
+  let err;
+  if(id){({error:err}=await db.from('events').update(payload).eq('id',id));}
+  else {({error:err}=await db.from('events').insert(payload));}
+  if(err){alert('保存失败: '+err.message);return;}
+  closeModal('evtModal');
+  await renderEvents();
+  await logAction(id?'update':'create','events',payload.name);
+}
+async function delEvent(id){
+  if(!confirm('确定删除该赛事？')) return;
+  const {error}=await db.from('events').delete().eq('id',id);
+  if(error){alert('删除失败: '+error.message);return;}
+  await renderEvents();
+  await logAction('delete','events',id);
+}
+
+/* ── VENUES ── */
+async function renderVenues(){
+  document.getElementById('pageActions').innerHTML='';
+  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
+  const {data}=await db.from('venues').select('*').order('name');
+  VENUES=data||[];
+  document.getElementById('pageSub').textContent=`共 ${VENUES.length} 个场馆`;
+  document.getElementById('content').innerHTML=`
+    <div class="section">
+      <div class="sec-head"><span class="sec-title">场馆列表</span><span class="sec-cnt">${VENUES.length}</span></div>
+      <div class="table-wrap"><table>
+        <tr><th>场馆</th><th>简称</th><th>运动项目</th><th>位置</th><th>颜色</th><th>状态</th><th>操作</th></tr>
+        ${VENUES.map(v=>`<tr>
+          <td style="color:var(--t1);font-weight:500">${v.name}</td>
+          <td>${v.short_name||'—'}</td>
+          <td>${v.sport||'—'}</td>
+          <td>${v.location||'—'}</td>
+          <td><div style="display:flex;align-items:center;gap:6px"><div style="width:16px;height:16px;border-radius:4px;background:${v.color}"></div>${v.color}</div></td>
+          <td><span class="badge ${v.is_active?'sched':'done'}">${v.is_active?'启用':'停用'}</span></td>
+          <td><button class="btn btn-ghost btn-sm" onclick='openVenueModal(${JSON.stringify(v).replace(/'/g,"&#39;")})'>编辑</button></td>
+        </tr>`).join('')}
+      </table></div>
+    </div>`;
+}
+function openVenueModal(v){
+  document.getElementById('venueModalTitle').textContent=v?'编辑场馆':'添加场馆';
+  document.getElementById('venueId').value=v?.id||'';
+  document.getElementById('venueName').value=v?.name||'';
+  document.getElementById('venueShort').value=v?.short_name||'';
+  document.getElementById('venueSport').value=v?.sport||'';
+  document.getElementById('venueColor').value=v?.color||'#3b82f6';
+  document.getElementById('venueLocation').value=v?.location||'';
+  document.getElementById('venueActive').checked=v?.is_active!==false;
+  document.getElementById('venueModal').classList.add('show');
+}
+async function saveVenue(){
+  const id=document.getElementById('venueId').value;
+  const payload={
+    name:document.getElementById('venueName').value.trim(),
+    short_name:document.getElementById('venueShort').value.trim(),
+    sport:document.getElementById('venueSport').value.trim(),
+    color:document.getElementById('venueColor').value,
+    location:document.getElementById('venueLocation').value.trim(),
+    is_active:document.getElementById('venueActive').checked,
+  };
+  const {error}=await db.from('venues').update(payload).eq('id',id);
+  if(error){alert('保存失败: '+error.message);return;}
+  closeModal('venueModal');
+  await renderVenues();
+}
+
+/* ── IMPORT ── */
+function renderImport(){
+  document.getElementById('content').innerHTML=`
+    <div class="section" style="margin-bottom:20px">
+      <div class="sec-head"><span class="sec-title">导入赛程数据</span></div>
+      <div style="padding:24px">
+        <div class="drop-zone" id="dz" onclick="document.getElementById('fileIn').click()">
+          <div class="drop-icon">📂</div>
+          <div class="drop-txt">点击选择或拖入 CSV / Excel 文件</div>
+          <div class="drop-sub">支持 .csv 格式，需包含：赛事名称、场馆、开始时间、结束时间、赛次</div>
+        </div>
+        <input type="file" id="fileIn" accept=".csv" style="display:none" onchange="handleFile(this)">
+        <div id="importPreview" style="margin-top:20px"></div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="sec-head"><span class="sec-title">导入历史</span></div>
+      <div id="importHist"><div style="padding:20px;text-align:center;color:var(--t3)">加载中…</div></div>
+    </div>`;
+  loadImportHist();
+  const dz=document.getElementById('dz');
+  dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
+  dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
+  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])processCSV(e.dataTransfer.files[0]);});
+}
+async function loadImportHist(){
+  const {data}=await db.from('import_history').select('*').order('created_at',{ascending:false}).limit(10);
+  const el=document.getElementById('importHist');
+  if(!data||!data.length){el.innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">暂无导入记录</div>';return;}
+  el.innerHTML=`<div class="table-wrap"><table>
+    <tr><th>文件名</th><th>总行数</th><th>成功</th><th>失败</th><th>状态</th><th>时间</th></tr>
+    ${data.map(h=>`<tr>
+      <td style="color:var(--t1)">${h.file_name||'—'}</td>
+      <td class="mono">${h.total_rows??'—'}</td>
+      <td class="mono" style="color:#10b981">${h.success_rows??'—'}</td>
+      <td class="mono" style="color:#ef4444">${h.failed_rows??'—'}</td>
+      <td>${statusBadge(h.status)}</td>
+      <td class="mono" style="font-size:10px">${fmtDT(new Date(h.created_at).getTime())}</td>
+    </tr>`).join('')}
+  </table></div>`;
+}
+function handleFile(input){if(input.files[0])processCSV(input.files[0]);}
+
+// Fuzzy column matching — maps any reasonable header variation to our field names
+function fuzzyMatchColumn(header){
+  const h=header.toLowerCase().trim();
+  if(/名称|赛事名|event.*name|name.*event|项目名|比赛名/.test(h)) return 'name';
+  if(/场馆|venue|地点|赛场/.test(h)) return 'venue';
+  if(/赛次|轮次|round|阶段|比赛轮/.test(h)) return 'round';
+  if(/开始.*时间|start.*time|start|开始|起始/.test(h)) return 'start_time';
+  if(/结束.*时间|end.*time|finish.*time|end|结束|终止/.test(h)) return 'end_time';
+  if(/频道|channel|播出|转播/.test(h)) return 'broadcast_channel';
+  if(/金牌|medal|is.*medal|奖牌/.test(h)) return 'is_medal_event';
+  if(/状态|status/.test(h)) return 'status';
+  if(/备注|note|remark|说明/.test(h)) return 'notes';
+  return null;
+}
+
+// Parse a date/time string into timestamp — handles many formats
+function parseDateTime(str){
+  if(!str||!str.trim()) return null;
+  str=str.trim().replace(/[年月]/g,'-').replace(/[日号]/g,'').replace(/\s+/g,' ');
+  const d=new Date(str);
+  if(!isNaN(d.getTime())) return d.getTime();
+  // Try common Chinese formats: 2025-11-06 09:00
+  const m=str.match(/(\d{4})[^\d](\d{1,2})[^\d](\d{1,2})[\sT](\d{1,2}):(\d{2})/);
+  if(m) return new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]).getTime();
+  // Date only — assume midnight
+  const d2=str.match(/(\d{4})[^\d](\d{1,2})[^\d](\d{1,2})/);
+  if(d2) return new Date(+d2[1],+d2[2]-1,+d2[3]).getTime();
+  return null;
+}
+
+// Fuzzy venue matching — find best venue by substring/similarity
+function fuzzyMatchVenue(val,venues){
+  if(!val) return null;
+  const v=val.trim();
+  // Exact match
+  let match=venues.find(vn=>vn.name===v||vn.short_name===v);
+  if(match) return match.id;
+  // Contains match
+  match=venues.find(vn=>vn.name.includes(v)||v.includes(vn.name)||(vn.short_name&&(vn.short_name.includes(v)||v.includes(vn.short_name))));
+  if(match) return match.id;
+  // Token overlap
+  const tokens=v.replace(/[赛场馆中心]/g,' ').split(/\s+/).filter(t=>t.length>1);
+  let best=null,bestScore=0;
+  venues.forEach(vn=>{
+    const score=tokens.filter(t=>vn.name.includes(t)||(vn.short_name&&vn.short_name.includes(t))).length;
+    if(score>bestScore){bestScore=score;best=vn;}
+  });
+  return bestScore>0?best.id:null;
+}
+
+let _importRows=[], _importMapping={};
+
+function processCSV(file){
+  const reader=new FileReader();
+  reader.onload=async e=>{
+    await loadVenueMap();
+    // Parse CSV (handle quoted fields)
+    const text=e.target.result;
+    const lines=text.split(/\r?\n/).filter(l=>l.trim());
+    if(!lines.length){alert('文件为空');return;}
+
+    // Simple CSV parser (handles quoted commas)
+    function parseRow(line){
+      const result=[],re=/("(?:[^"]|"")*"|[^,]*),?/g;
+      let m;while((m=re.exec(line))!==null&&m[0].length){
+        let v=m[1];if(v.startsWith('"')&&v.endsWith('"'))v=v.slice(1,-1).replace(/""/g,'"');
+        result.push(v.trim());
+      }
+      return result;
+    }
+
+    const headers=parseRow(lines[0]);
+    const mapping={};
+    headers.forEach((h,i)=>{const f=fuzzyMatchColumn(h);if(f)mapping[i]=f;});
+
+    // Parse all data rows
+    _importRows=lines.slice(1).filter(l=>l.trim()).map(l=>parseRow(l));
+    _importMapping=mapping;
+
+    // Map rows to event records for preview
+    const mapped=_importRows.slice(0,5).map(row=>{
+      const rec={};
+      Object.entries(mapping).forEach(([i,field])=>rec[field]=row[+i]||'');
+      return rec;
+    });
+
+    // Field labels
+    const labels={name:'赛事名称',venue:'场馆',round:'赛次',start_time:'开始时间',end_time:'结束时间',broadcast_channel:'频道',is_medal_event:'金牌',status:'状态',notes:'备注'};
+    const mappedFields=Object.values(mapping);
+    const missingRequired=['name','venue','start_time','end_time'].filter(f=>!mappedFields.includes(f));
+
+    // Column mapping display
+    const mapDisplay=headers.map((h,i)=>{
+      const f=mapping[i];
+      return `<tr><td style="color:var(--t1)">${h}</td><td style="color:${f?'#10b981':'var(--t3)'}">→ ${f?labels[f]||f:'（忽略）'}</td></tr>`;
+    }).join('');
+
+    // Preview table
+    const previewHeaders=Object.values(mapping).map(f=>labels[f]||f);
+    const previewRows=mapped.map(rec=>`<tr>${Object.values(mapping).map((f,_i)=>`<td style="font-size:11px">${rec[f]||''}</td>`).join('')}</tr>`).join('');
+
+    document.getElementById('importPreview').innerHTML=`
+      <div style="background:var(--gl);border:1px solid var(--b1);border-radius:8px;padding:16px;margin-bottom:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:10px">📐 智能列映射</div>
+        <div class="table-wrap"><table><tr><th>原始列名</th><th>映射字段</th></tr>${mapDisplay}</table></div>
+        ${missingRequired.length?`<div style="margin-top:10px;color:#f87171;font-size:11px">⚠️ 缺少必要字段: ${missingRequired.map(f=>labels[f]).join('、')}</div>`:'<div style="margin-top:10px;color:#10b981;font-size:11px">✓ 必要字段已识别</div>'}
+      </div>
+      <div style="background:var(--gl);border:1px solid var(--b1);border-radius:8px;padding:16px">
+        <div style="font-size:12px;font-weight:600;color:var(--t2);margin-bottom:10px">预览（前5行）</div>
+        <div class="table-wrap"><table>
+          <tr>${previewHeaders.map(h=>`<th>${h}</th>`).join('')}</tr>${previewRows}
+        </table></div>
+        <div style="margin-top:10px;font-size:12px;color:var(--t3)">共 ${_importRows.length} 行数据</div>
+        ${missingRequired.length?'':
+          `<div style="margin-top:14px;display:flex;gap:10px;align-items:center">
+            <button class="btn btn-primary" onclick="doImport()">✓ 确认导入 ${_importRows.length} 条数据</button>
+            <span style="font-size:11px;color:var(--t3)">场馆名称将自动模糊匹配</span>
+          </div>`
+        }
+      </div>`;
+  };
+  reader.readAsText(file,'UTF-8');
+}
+
+async function doImport(){
+  await loadVenueMap();
+  const btn=document.querySelector('#importPreview .btn-primary');
+  if(btn){btn.disabled=true;btn.textContent='导入中…';}
+
+  const mapping=_importMapping;
+  const rows=_importRows;
+  const labels={name:'赛事名称',venue:'场馆',round:'赛次',start_time:'开始时间',end_time:'结束时间'};
+
+  let ok=0,fail=0,failDetails=[];
+  const batchSize=50;
+  const payloads=[];
+
+  rows.forEach((row,idx)=>{
+    const rec={};
+    Object.entries(mapping).forEach(([i,field])=>rec[field]=row[+i]||'');
+    const name=rec.name?.trim();
+    if(!name){fail++;failDetails.push(`行${idx+2}: 缺少名称`);return;}
+    const st=parseDateTime(rec.start_time);
+    const et=parseDateTime(rec.end_time);
+    if(!st){fail++;failDetails.push(`行${idx+2}: 无法解析开始时间 "${rec.start_time}"`);return;}
+    if(!et){fail++;failDetails.push(`行${idx+2}: 无法解析结束时间 "${rec.end_time}"`);return;}
+    const venueId=fuzzyMatchVenue(rec.venue,VENUES);
+    if(!venueId){fail++;failDetails.push(`行${idx+2}: 未找到场馆 "${rec.venue}"`);return;}
+    const payload={
+      name,venue_id:venueId,
+      round:rec.round||'其他',
+      start_time:st,end_time:et,
+      broadcast_channel:rec.broadcast_channel||null,
+      status:rec.status||'scheduled',
+      is_medal_event:['true','1','是','yes'].includes((rec.is_medal_event||'').toLowerCase()),
+      notes:rec.notes||null,
+    };
+    payloads.push(payload);
+  });
+
+  // Insert in batches
+  for(let i=0;i<payloads.length;i+=batchSize){
+    const batch=payloads.slice(i,i+batchSize);
+    const {error}=await db.from('events').insert(batch);
+    if(error){fail+=batch.length;failDetails.push('批量插入失败: '+error.message);}
+    else ok+=batch.length;
+  }
+
+  // Log to import_history
+  await db.from('import_history').insert({file_name:'CSV导入',total_rows:rows.length,success_rows:ok,failed_rows:fail,status:fail===0?'completed':'completed'}).catch(()=>{});
+  await logAction('import','events',`导入 ${ok} 条赛事`);
+
+  const msg=fail>0
+    ?`✓ 成功导入 ${ok} 条，失败 ${fail} 条\n${failDetails.slice(0,5).join('\n')}`
+    :`✓ 全部 ${ok} 条数据导入成功！`;
+  alert(msg);
+  _importRows=[];_importMapping={};
+  await renderImport();
+}
+
+/* ── EXPORT ── */
+async function renderExport(){
+  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
+  await loadVenueMap();
+  const {data:evs}=await db.from('events').select('*').order('start_time');
+  const events=evs||[];
+  document.getElementById('pageSub').textContent=`共 ${events.length} 条`;
+  document.getElementById('pageActions').innerHTML=`
+    <button class="btn btn-primary" onclick="exportReport('all')">📄 导出完整报表</button>
+    <button class="btn btn-ghost" onclick="exportReport('today')">今日赛程</button>
+    <button class="btn btn-ghost" onclick="exportReport('medal')">金牌赛事</button>`;
+  // Group by date for preview
+  const groups={};
+  events.forEach(e=>{
+    const d=new Date(e.start_time);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if(!groups[key])groups[key]=[];
+    groups[key].push(e);
+  });
+  const today=new Date();const todayKey=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  document.getElementById('content').innerHTML=`
+    <div class="section" style="margin-bottom:20px">
+      <div class="sec-head">
+        <span class="sec-title">报表设置</span>
+        <div class="sec-actions">
+          <button class="btn btn-primary" onclick="exportReport('all')">📄 导出完整报表</button>
+          <button class="btn btn-ghost" onclick="exportReport('today')">今日赛程</button>
+          <button class="btn btn-ghost" onclick="exportReport('medal')">金牌赛事报表</button>
+        </div>
+      </div>
+      <div style="padding:20px;display:flex;gap:20px;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;font-weight:700;letter-spacing:.08em">报表格式</div>
+          <div style="font-size:12px;color:var(--t2);line-height:2">✓ 标题栏：系统名称、导出时间<br>✓ 数据表：按日期分组，统一格式<br>✓ 汇总栏：各类统计数字<br>✓ 导出为可打印 HTML</div>
+        </div>
+        <div style="flex:1;min-width:200px">
+          <div style="font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;font-weight:700;letter-spacing:.08em">数据概况</div>
+          <div style="font-size:12px;color:var(--t2);line-height:2">总赛事：${events.length} 条<br>今日赛事：${(groups[todayKey]||[]).length} 条<br>金牌赛事：${events.filter(e=>e.is_medal_event).length} 条<br>共 ${Object.keys(groups).length} 个赛事日</div>
+        </div>
+      </div>
+    </div>
+    <div class="section">
+      <div class="sec-head"><span class="sec-title">赛程预览（按日期分组）</span></div>
+      ${Object.entries(groups).map(([date,evts])=>`
+        <div style="padding:10px 20px;border-bottom:1px solid var(--b1)">
+          <div style="font-size:11px;font-weight:700;color:var(--acl);margin-bottom:6px;display:flex;align-items:center;gap:8px">
+            <span>${date}${date===todayKey?' 📍今天':''}</span>
+            <span style="font-weight:400;color:var(--t3)">${evts.length} 场</span>
+            ${evts.filter(e=>e.is_medal_event).length?`<span style="color:#fbbf24">🥇 ${evts.filter(e=>e.is_medal_event).length} 枚金牌</span>`:''}
+          </div>
+          <div class="table-wrap"><table style="font-size:11px">
+            <tr><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th></tr>
+            ${evts.map(ev=>`<tr>
+              <td style="color:var(--t1)">${ev.is_medal_event?'🥇 ':''}${ev.name}</td>
+              <td>${VENUES.find(v=>v.id===ev.venue_id)?.short_name||'—'}</td>
+              <td><span class="badge">${ev.round}</span></td>
+              <td class="mono">${fmtDT(ev.start_time)}</td>
+              <td class="mono">${fmtDT(ev.end_time)}</td>
+              <td>${statusBadge(ev.status)}</td>
+            </tr>`).join('')}
+          </table></div>
+        </div>`).join('')}
+    </div>`;
+  window._allEventsExport=events;
+  window._venueMapExport=VENUES;
+}
+
+async function exportReport(type){
+  await loadVenueMap();
+  const {data:evs}=await db.from('events').select('*').order('start_time');
+  let events=evs||[];
+  const today=new Date();const todayKey=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+
+  let title='亚沙会转播赛程报表';
+  if(type==='today'){
+    events=events.filter(e=>{const d=new Date(e.start_time);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`===todayKey;});
+    title='今日转播赛程报表';
+  } else if(type==='medal'){
+    events=events.filter(e=>e.is_medal_event);
+    title='金牌赛事转播报表';
+  }
+
+  const groups={};
+  events.forEach(e=>{
+    const d=new Date(e.start_time);
+    const key=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
+    if(!groups[key])groups[key]=[];
+    groups[key].push(e);
+  });
+  const exportDt=`${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日 ${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`;
+  const totalMedal=events.filter(e=>e.is_medal_event).length;
+  const totalLive=events.filter(e=>e.status==='live').length;
+  const totalDone=events.filter(e=>e.status==='finished'||e.status==='completed').length;
+
+  const vMap={};VENUES.forEach(v=>vMap[v.id]=v);
+  function statusText(s){return {live:'直播中',scheduled:'计划中',finished:'已完成',completed:'已完成',cancelled:'已取消'}[s]||s;}
+
+  const html=`<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8"><title>${title}</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Microsoft YaHei',Arial,sans-serif;font-size:13px;color:#1a202c;background:#fff;padding:20px}
+  .report-wrap{max-width:1100px;margin:0 auto}
+  /* ── HEADER ── */
+  .rpt-header{background:linear-gradient(135deg,#1e3a5f,#2d5a8e);color:#fff;padding:24px 32px;border-radius:8px 8px 0 0;margin-bottom:0}
+  .rpt-title{font-size:22px;font-weight:700;letter-spacing:.06em}
+  .rpt-sub{font-size:12px;opacity:.75;margin-top:4px;letter-spacing:.04em}
+  .rpt-meta{display:flex;gap:24px;margin-top:16px;flex-wrap:wrap}
+  .rpt-meta-item{font-size:11px;opacity:.8}
+  .rpt-meta-item span{font-weight:700;font-size:14px;display:block;margin-bottom:2px;color:#90cdf4}
+  /* ── STATS BAR ── */
+  .rpt-stats{display:flex;background:#f7fafc;border:1px solid #e2e8f0;border-top:none;padding:12px 32px;gap:32px}
+  .rpt-stat{text-align:center}
+  .rpt-stat-num{font-size:20px;font-weight:700;color:#2d3748}
+  .rpt-stat-lbl{font-size:10px;color:#718096;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
+  /* ── TABLE ── */
+  .rpt-section{margin-bottom:0}
+  .rpt-date-hdr{background:#2d5a8e;color:#fff;padding:8px 20px;font-size:12px;font-weight:700;letter-spacing:.06em;display:flex;align-items:center;gap:12px}
+  .rpt-date-badge{background:rgba(255,255,255,.2);padding:2px 8px;border-radius:3px;font-size:10px}
+  table{width:100%;border-collapse:collapse}
+  th{padding:8px 16px;text-align:left;font-size:10px;font-weight:700;color:#4a5568;background:#f7fafc;text-transform:uppercase;letter-spacing:.08em;border:1px solid #e2e8f0}
+  td{padding:9px 16px;border:1px solid #e2e8f0;vertical-align:middle;font-size:12px;color:#2d3748}
+  tr:nth-child(even) td{background:#f7fafc}
+  .medal-row td{background:#fffbeb!important;border-left:3px solid #f6ad55}
+  .badge-live{background:#fed7d7;color:#c53030;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600}
+  .badge-sched{background:#bee3f8;color:#2b6cb0;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600}
+  .badge-done{background:#e2e8f0;color:#4a5568;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600}
+  /* ── FOOTER ── */
+  .rpt-footer{background:#2d3748;color:#a0aec0;padding:16px 32px;border-radius:0 0 8px 8px;display:flex;justify-content:space-between;align-items:center;font-size:11px}
+  .rpt-footer strong{color:#e2e8f0}
+  @media print{body{padding:0}.report-wrap{max-width:100%}.rpt-header{border-radius:0}.rpt-footer{border-radius:0}}
+</style></head><body>
+<div class="report-wrap">
+  <div class="rpt-header">
+    <div class="rpt-title">🏖️ ${title}</div>
+    <div class="rpt-sub">2025年三亚亚洲沙滩运动会 · 亚沙会智慧转播赛程管理系统</div>
+    <div class="rpt-meta">
+      <div class="rpt-meta-item"><span>${events.length}</span>总赛事数</div>
+      <div class="rpt-meta-item"><span>${Object.keys(groups).length}</span>赛事天数</div>
+      <div class="rpt-meta-item"><span>${totalMedal}</span>金牌赛事</div>
+      <div class="rpt-meta-item"><span>${exportDt}</span>导出时间</div>
+    </div>
+  </div>
+  <div class="rpt-stats">
+    <div class="rpt-stat"><div class="rpt-stat-num">${events.length}</div><div class="rpt-stat-lbl">总赛事</div></div>
+    <div class="rpt-stat"><div class="rpt-stat-num" style="color:#c53030">${totalLive}</div><div class="rpt-stat-lbl">直播中</div></div>
+    <div class="rpt-stat"><div class="rpt-stat-num" style="color:#276749">${totalDone}</div><div class="rpt-stat-lbl">已完成</div></div>
+    <div class="rpt-stat"><div class="rpt-stat-num" style="color:#d97706">${totalMedal}</div><div class="rpt-stat-lbl">金牌赛次</div></div>
+    <div class="rpt-stat"><div class="rpt-stat-num">${Object.keys(groups).length}</div><div class="rpt-stat-lbl">赛事日</div></div>
+  </div>
+  ${Object.entries(groups).map(([date,evts])=>`
+  <div class="rpt-section">
+    <div class="rpt-date-hdr">
+      📅 ${date}
+      <span class="rpt-date-badge">共 ${evts.length} 场</span>
+      ${evts.filter(e=>e.is_medal_event).length?`<span class="rpt-date-badge">🥇 ${evts.filter(e=>e.is_medal_event).length} 枚金牌</span>`:''}
+    </div>
+    <table>
+      <tr><th>#</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>时长</th><th>转播频道</th><th>状态</th></tr>
+      ${evts.map((ev,i)=>{
+        const dur=Math.round((ev.end_time-ev.start_time)/60000);
+        const venue=vMap[ev.venue_id];
+        const sText=statusText(ev.status);
+        const sBadge=ev.status==='live'?'badge-live':ev.status==='scheduled'?'badge-sched':'badge-done';
+        const d=new Date(ev.start_time),de=new Date(ev.end_time);
+        const fmt=t=>`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+        return `<tr class="${ev.is_medal_event?'medal-row':''}">
+          <td style="color:#a0aec0;font-size:11px">${i+1}</td>
+          <td style="font-weight:600">${ev.is_medal_event?'🥇 ':''}${ev.name}</td>
+          <td>${venue?.short_name||venue?.name||'—'}</td>
+          <td>${ev.round||'—'}</td>
+          <td>${fmt(d)}</td>
+          <td>${fmt(de)}</td>
+          <td style="color:#718096">${dur}分钟</td>
+          <td style="color:#4a5568">${ev.broadcast_channel||'—'}</td>
+          <td><span class="${sBadge}">${sText}</span></td>
+        </tr>`;
+      }).join('')}
+    </table>
+  </div>`).join('')}
+  <div class="rpt-footer">
+    <div>Live-CUE · 亚沙会智慧转播赛程管理系统 &nbsp;|&nbsp; 2025年三亚亚洲沙滩运动会</div>
+    <div>导出时间：<strong>${exportDt}</strong> &nbsp;|&nbsp; 数据条目：<strong>${events.length}</strong> 条</div>
+  </div>
+</div>
+</body></html>`;
+
+  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=`${title}-${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}.html`;
+  a.click();URL.revokeObjectURL(url);
+}
+
+/* ── AUDIT ── */
+async function renderAudit(){
+  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
+  const {data}=await db.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(50);
+  LOGS=data||[];
+  const icons={create:'＋',update:'✎',delete:'✕',import:'⇧',login:'◉'};
+  document.getElementById('content').innerHTML=`
+    <div class="section">
+      <div class="sec-head"><span class="sec-title">操作日志</span><span class="sec-cnt">最近50条</span></div>
+      ${LOGS.length?LOGS.map(l=>`
+        <div class="log-row">
+          <div class="log-icon ${l.action}">${icons[l.action]||'●'}</div>
+          <div class="log-body">
+            <div class="log-action">${l.summary||`${l.action} · ${l.table_name}`}</div>
+            <div class="log-meta">${l.user_email||'system'} · ${fmtDT(new Date(l.created_at).getTime())}</div>
+          </div>
+        </div>`).join(''):'<div style="padding:30px;text-align:center;color:var(--t3)">暂无日志（需运行 SQL 脚本启用审计功能）</div>'}
+    </div>`;
+}
+
+/* ── HELPERS ── */
+async function loadVenueMap(){
+  if(VENUES.length) return;
+  const {data}=await db.from('venues').select('*').order('name');
+  VENUES=data||[];
+}
+async function logAction(action,table,summary){
+  if(!CUR_USER) return;
+  await db.from('audit_logs').insert({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary}).catch(()=>{});
+}
+function statusBadge(s){
+  const map={live:'<span class="badge live"><span class="dot live"></span>直播中</span>',scheduled:'<span class="badge sched">计划中</span>',finished:'<span class="badge done">已完成</span>',cancelled:'<span class="badge done">已取消</span>',completed:'<span class="badge done">已完成</span>'};
+  return map[s]||`<span class="badge">${s}</span>`;
+}
+function fmtDT(ts){
+  if(!ts) return '—';
+  const d=new Date(ts);
+  return `${d.getMonth()+1}/${d.getDate()} ${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+function p2(v){return String(v).padStart(2,'0');}
+function toLocalDT(ts){
+  if(!ts) return '';
+  const d=new Date(ts);
+  return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}T${p2(d.getHours())}:${p2(d.getMinutes())}`;
+}
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{if(e.target===m)m.classList.remove('show');}));
+
+/* ── INIT ── */
+checkAuth();
+</script>
+</body>
+</html>
