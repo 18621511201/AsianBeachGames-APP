@@ -641,12 +641,14 @@ function showEmptyState(show){
   if(es) es.style.display=show?'flex':'none';
 }
 
+const _ROUND_LABELS={'半决赛':{zh:'半决赛',en:'Semifinal'},'决赛':{zh:'决赛',en:'Final'}};
 function updateRoundFilter(){
-  // Fixed buttons only: 半决赛 + 决赛 — just sync active state
+  // Fixed buttons only: 半决赛 + 决赛 — sync active state and label language
   document.querySelectorAll('.brd[data-r]').forEach(b=>{
     const r=b.getAttribute('data-r');
     b.classList.toggle('active', selectedRounds.has(r));
-    b.textContent=isZh?r:_translateStr(r);
+    const lbl=_ROUND_LABELS[r];
+    if(lbl) b.textContent=isZh?lbl.zh:lbl.en;
   });
 }
 
@@ -915,9 +917,9 @@ function updateZL(){
   const gsW=document.getElementById('gs').clientWidth||800;
   const visMin=Math.round(gsW/PPM);
   let lbl;
-  if(visMin<120) lbl=visMin+(isZh?'分钟':'min');
-  else if(visMin<2880) lbl=Math.round(visMin/60)+(isZh?'小时':'h');
-  else lbl=Math.round(visMin/1440)+(isZh?'天':'d');
+  if(visMin<120) lbl=visMin+(isZh?'分钟':' min');
+  else if(visMin<2880) lbl=Math.round(visMin/60)+(isZh?'小时':' hours');
+  else lbl=Math.round(visMin/1440)+(isZh?'天':' days');
   document.getElementById('zmv').textContent=lbl;
 }
 
@@ -1125,8 +1127,8 @@ const VENUE_EN={
   '开幕式':'Opening Ceremony','闭幕式':'Closing Ceremony','颁奖':'Medal Ceremony',
 };
 const TERM_EN={
-  // Phase / round names (confirmed from Excel schedule)
-  '预赛阶段':'Preliminary Phase','预赛':'Prelims',
+  // ── Phase / round names (from Excel) ──────────────────────────────────────
+  '预赛阶段':'Preliminary Phase','预赛':'Preliminary','复赛':'Second Stage',
   '资格赛':'Qualifier','小组赛':'Group Stage','单循环赛':'Single Round Robin',
   '单循环决赛':'Round-Robin Final','循环赛':'Round Robin',
   '循环赛第一轮':'Round 1','循环赛第二轮':'Round 2','循环赛第三轮':'Round 3',
@@ -1141,8 +1143,53 @@ const TERM_EN={
   '¼决赛':'Quarterfinal',
   '半决赛':'Semifinal','季军赛':'Bronze Final','铜牌赛':'Bronze Final',
   '铜牌决赛':'Bronze Final','金牌赛':'Gold Final','决赛':'Final','总决赛':'Grand Final',
-  '淘汰赛':'Elimination','复活赛':'Repechage','表演赛':'Exhibition',
-  // Relay
+  '淘汰赛':'Elimination Round','复活赛':'Repechage','表演赛':'Exhibition',
+  '女子组决赛轮':'Women\'s Final Round','男子组决赛轮':'Men\'s Final Round',
+  '3轮空':'Bye (Round 3)',
+  // ── 3×3 Basketball (from Excel) ───────────────────────────────────────────
+  '铜牌赛 W':'Bronze Medal Game (W)','铜牌赛 M':'Bronze Medal Game (M)',
+  '金牌赛 W':'Gold Medal Game (W)','金牌赛 M':'Gold Medal Game (M)',
+  // ── Jiu Jitsu weight categories (from Excel) ──────────────────────────────
+  '女子-52公斤':'Women\'s -52kg','女子-57公斤':'Women\'s -57kg',
+  '女子-63公斤':'Women\'s -63kg','男子-62公斤':'Men\'s -62kg',
+  '男子-69公斤':'Men\'s -69kg','男子-77公斤':'Men\'s -77kg',
+  // ── Beach Wrestling weight categories (from Excel) ────────────────────────
+  '男子70公斤':'Men\'s 70kg','男子80公斤':'Men\'s 80kg',
+  '男子90公斤':'Men\'s 90kg','男子+90公斤':'Men\'s +90kg',
+  '女子50公斤':'Women\'s 50kg','女子60公斤':'Women\'s 60kg',
+  '女子70公斤':'Women\'s 70kg','女子+70公斤':'Women\'s +70kg',
+  // ── Dragon Boat (from Excel) ───────────────────────────────────────────────
+  '男子12人制100米':'Men\'s 100m (12-player)','女子12人制100米':'Women\'s 100m (12-player)',
+  '男子12人制200米':'Men\'s 200m (12-player)','女子12人制200米':'Women\'s 200m (12-player)',
+  '男子12人制400米':'Men\'s 400m (12-player)','女子12人制400米':'Women\'s 400m (12-player)',
+  // ── Beach Athletics events (from Excel) ───────────────────────────────────
+  '女子60米':'Women\'s 60m','男子60米':'Men\'s 60m',
+  '女子4×60米接力':'Women\'s 4×60m Relay','男子4×60米接力':'Men\'s 4×60m Relay',
+  '女子4*60米接力':'Women\'s 4×60m Relay','男子4*60米接力':'Men\'s 4×60m Relay',
+  '男子跳高':'Men\'s High Jump','女子跳高':'Women\'s High Jump',
+  '男子跳远':'Men\'s Long Jump','女子跳远':'Women\'s Long Jump',
+  '男子铅球':'Men\'s Shot Put','女子铅球':'Women\'s Shot Put',
+  // ── Aquathlon (from Excel) ─────────────────────────────────────────────────
+  '男子个人比赛':'Men\'s Individual','女子个人比赛':'Women\'s Individual',
+  '混合接力比赛':'Mixed Relay',
+  // ── Open Water Swimming (from Excel) ──────────────────────────────────────
+  '男子5公里':'Men\'s 5km','女子5公里':'Women\'s 5km',
+  '男女混合：4*1.5公里接力':'Mixed 4×1.5km Relay',
+  // ── Beach Football (from Excel) ────────────────────────────────────────────
+  '3、4名决赛':'Bronze Medal Match','1、2决赛':'Gold Medal Match',
+  // ── Group labels (from Excel) ──────────────────────────────────────────────
+  'A组第1名':'1st in Group A','B组第1名':'1st in Group B',
+  'A组第2名':'2nd in Group A','B组第2名':'2nd in Group B',
+  'A组第3名':'3rd in Group A','B组第3名':'3rd in Group B',
+  'A组':'Group A','B组':'Group B','C组':'Group C','D组':'Group D',
+  'E组':'Group E','F组':'Group F','G组':'Group G','H组':'Group H',
+  'N组':'Group N','O组':'Group O',
+  '男子A组':'Men\'s Group A','男子B组':'Men\'s Group B',
+  '女子A组':'Women\'s Group A','女子B组':'Women\'s Group B',
+  // ── Ceremonies (from Excel) ────────────────────────────────────────────────
+  '颁奖仪式':'Victory Ceremony','颁奖典礼':'Medal Ceremony',
+  '开赛仪式':'Opening Ceremony',
+  // ── Relay
   '接力赛':'Relay Race','接力':'Relay',
   // Combined / All-Around
   '十项全能':'Decathlon','五项全能':'Pentathlon','七项全能':'Heptathlon','全能':'All-Around',
@@ -1283,7 +1330,11 @@ function toggleLang(){
     const svg=rbl.querySelector('svg').outerHTML;
     rbl.innerHTML=svg+(isZh?'赛次':'Round');
   }
-  document.querySelector('.brd[data-r="all"]').textContent=isZh?'全部':'All';
+  // Round filter buttons — fixed: 半决赛 / 决赛
+  const bSF=document.querySelector('.brd[data-r="半决赛"]');
+  const bF =document.querySelector('.brd[data-r="决赛"]');
+  if(bSF) bSF.textContent=isZh?'半决赛':'Semifinal';
+  if(bF)  bF.textContent =isZh?'决赛':'Final';
   // Venue panel header
   document.querySelector('.vphl').textContent=isZh?'场馆/项目':'Venues';
   // Status bar
