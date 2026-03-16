@@ -6,6 +6,8 @@
 <title>Live-CUE 管理后台</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js"></script>
 <style>
 :root{--bg:#0a0c14;--surf:#0f1220;--elev:#171a2e;--gl:rgba(255,255,255,.04);--b1:rgba(255,255,255,.06);--b2:rgba(255,255,255,.12);--acc:#3b82f6;--acl:#60a5fa;--ag:rgba(59,130,246,.35);--live:#ef4444;--up:#f59e0b;--ok:#10b981;--t1:#f1f5f9;--t2:#94a3b8;--t3:#475569;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;--r:8px}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -581,29 +583,272 @@ async function saveVenue(){
 }
 
 /* ── IMPORT ── */
+// ── TEAM SPORTS (need -10min cue; others -5min) ──────────────────────────────
+const TEAM_VENUE_KEYWORDS=['水球','三人篮球','沙滩足球','沙滩手球','沙滩卡巴迪','龙舟','沙滩排球'];
+function isTeamEvent(ev){
+  const v=VENUES.find(x=>x.id===ev.venue_id);
+  if(!v) return false;
+  return TEAM_VENUE_KEYWORDS.some(k=>(v.name||'').includes(k)||(v.short_name||'').includes(k));
+}
+
 function renderImport(){
+  const savedKey=localStorage.getItem('claude_api_key')||'';
+  document.getElementById('pageTitle').textContent='智能导入';
+  document.getElementById('pageSub').textContent='支持 PDF · Excel · Word';
+  document.getElementById('pageActions').innerHTML='';
   document.getElementById('content').innerHTML=`
-    <div class="section" style="margin-bottom:20px">
-      <div class="sec-head"><span class="sec-title">导入赛程数据</span></div>
-      <div style="padding:24px">
-        <div class="drop-zone" id="dz" onclick="document.getElementById('fileIn').click()">
-          <div class="drop-icon">📂</div>
-          <div class="drop-txt">点击选择或拖入 CSV / Excel 文件</div>
-          <div class="drop-sub">支持 .csv 格式，需包含：赛事名称、场馆、开始时间、结束时间、赛次</div>
+    <!-- API Key -->
+    <div class="section" style="margin-bottom:16px">
+      <div class="sec-head"><span class="sec-title">🤖 AI 模型配置</span></div>
+      <div style="padding:16px 20px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="flex:1;min-width:280px;margin:0">
+          <label>Claude API Key <span style="color:var(--t3);font-weight:400">(存储在本地，不上传)</span></label>
+          <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-…" value="${savedKey}"
+            style="font-family:var(--mono);font-size:11px">
         </div>
-        <input type="file" id="fileIn" accept=".csv" style="display:none" onchange="handleFile(this)">
-        <div id="importPreview" style="margin-top:20px"></div>
+        <button class="btn btn-primary" onclick="saveApiKey()" style="margin-bottom:1px">保存密钥</button>
+        <span id="apiKeyStatus" style="font-size:11px;color:var(--t3);align-self:center"></span>
       </div>
     </div>
+    <!-- Upload zone -->
+    <div class="section" style="margin-bottom:16px">
+      <div class="sec-head"><span class="sec-title">📂 上传文件</span></div>
+      <div style="padding:20px">
+        <div class="drop-zone" id="dz" onclick="document.getElementById('fileIn').click()" style="cursor:pointer">
+          <div class="drop-icon">📂</div>
+          <div class="drop-txt">点击选择 或 拖入文件</div>
+          <div class="drop-sub">支持 Excel (.xlsx .xls) · Word (.docx) · PDF (.pdf) · CSV (.csv)</div>
+        </div>
+        <input type="file" id="fileIn" accept=".xlsx,.xls,.csv,.docx,.pdf"
+          style="display:none" onchange="handleSmartFile(this)">
+        <div id="fileStatus" style="margin-top:12px;font-size:12px;color:var(--t3)"></div>
+      </div>
+    </div>
+    <!-- AI Analysis result -->
+    <div class="section" id="aiResultSection" style="display:none;margin-bottom:16px">
+      <div class="sec-head">
+        <span class="sec-title">🔍 AI 解析结果</span>
+        <span class="sec-cnt" id="aiResultCnt">0 条</span>
+        <div class="sec-actions">
+          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('aiResultSection').style.display='none'">清除</button>
+          <button class="btn btn-primary btn-sm" onclick="confirmAiImport()">✓ 确认导入数据库</button>
+        </div>
+      </div>
+      <div id="aiResultBody" style="padding:0"></div>
+    </div>
+    <!-- Import history / log -->
     <div class="section">
-      <div class="sec-head"><span class="sec-title">导入历史</span></div>
+      <div class="sec-head"><span class="sec-title">📋 导入日志</span><span class="sec-cnt">最近20条</span></div>
       <div id="importHist"><div style="padding:20px;text-align:center;color:var(--t3)">加载中…</div></div>
     </div>`;
-  loadImportHist();
+
+  // Drag-drop
   const dz=document.getElementById('dz');
   dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('drag');});
   dz.addEventListener('dragleave',()=>dz.classList.remove('drag'));
-  dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])processCSV(e.dataTransfer.files[0]);});
+  dz.addEventListener('drop',e=>{
+    e.preventDefault();dz.classList.remove('drag');
+    const f=e.dataTransfer.files[0];if(f)processSmartFile(f);
+  });
+  loadImportHist();
+  if(savedKey) document.getElementById('apiKeyStatus').textContent='✓ 已配置';
+}
+
+function saveApiKey(){
+  const k=document.getElementById('apiKeyInput').value.trim();
+  if(!k){alert('请输入有效的 API Key');return;}
+  localStorage.setItem('claude_api_key',k);
+  document.getElementById('apiKeyStatus').textContent='✓ 已保存';
+  setTimeout(()=>document.getElementById('apiKeyStatus').textContent='',2000);
+}
+
+function handleSmartFile(input){if(input.files[0])processSmartFile(input.files[0]);}
+
+async function processSmartFile(file){
+  await loadVenueMap();
+  const st=document.getElementById('fileStatus');
+  const ext=file.name.split('.').pop().toLowerCase();
+  st.innerHTML=`<span style="color:var(--up)">⏳ 正在读取文件：${file.name}…</span>`;
+  let rawText='';
+  try{
+    if(ext==='csv'){
+      rawText=await file.text();
+    } else if(['xlsx','xls'].includes(ext)){
+      rawText=await readExcelAsText(file);
+    } else if(ext==='docx'){
+      rawText=await readDocxAsText(file);
+    } else if(ext==='pdf'){
+      rawText=await readPdfAsText(file);
+    } else {
+      st.innerHTML='<span style="color:#ef4444">不支持的文件格式</span>';return;
+    }
+    st.innerHTML=`<span style="color:var(--ok)">✓ 文件读取成功（${rawText.length} 字符）</span> — <span style="color:var(--up)">⏳ AI 分析中…</span>`;
+    await analyzeWithClaude(rawText, file.name);
+  } catch(e){
+    st.innerHTML=`<span style="color:#ef4444">错误：${e.message}</span>`;
+  }
+}
+
+async function readExcelAsText(file){
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  let text='';
+  wb.SheetNames.forEach(sn=>{
+    const ws=wb.Sheets[sn];
+    text+=`\n=== 工作表：${sn} ===\n`;
+    text+=XLSX.utils.sheet_to_csv(ws,{blankrows:false});
+  });
+  return text;
+}
+
+async function readDocxAsText(file){
+  const buf=await file.arrayBuffer();
+  const result=await mammoth.extractRawText({arrayBuffer:buf});
+  return result.value;
+}
+
+async function readPdfAsText(file){
+  // Use PDF.js from CDN dynamically
+  if(!window.pdfjsLib){
+    await new Promise((res,rej)=>{
+      const s=document.createElement('script');
+      s.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@4.4.168/build/pdf.min.mjs';
+      s.type='module'; s.onload=res; s.onerror=rej;
+      document.head.appendChild(s);
+    }).catch(()=>{});
+    // Fallback: use simpler build
+    if(!window.pdfjsLib){
+      await new Promise((res,rej)=>{
+        const s=document.createElement('script');
+        s.src='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js';
+        s.onload=()=>{
+          window.pdfjsLib=window['pdfjs-dist/build/pdf'];
+          pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+          res();
+        };s.onerror=rej;document.head.appendChild(s);
+      });
+    }
+  }
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let text='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const pg=await pdf.getPage(i);
+    const tc=await pg.getTextContent();
+    text+=tc.items.map(x=>x.str).join(' ')+'\n';
+  }
+  return text;
+}
+
+let _aiParsedEvents=[];
+
+async function analyzeWithClaude(rawText, fileName){
+  const apiKey=localStorage.getItem('claude_api_key')||'';
+  if(!apiKey){
+    document.getElementById('fileStatus').innerHTML='<span style="color:#ef4444">请先填写并保存 Claude API Key</span>';return;
+  }
+  await loadVenueMap();
+  const venueList=VENUES.map(v=>`${v.id}|${v.short_name||v.name}`).join('\n');
+
+  const prompt=`你是一个体育赛程数据提取专家。从以下文件内容中提取所有比赛单元日程。
+
+当前可用场馆（id|名称）：
+${venueList}
+
+文件内容：
+${rawText.slice(0,12000)}
+
+请提取所有比赛单元，返回严格的 JSON 数组，每条记录包含：
+{
+  "name": "赛事名称（中英文）",
+  "venue_id": "从上方场馆列表中匹配最合适的venue_id，如无法匹配填null",
+  "round": "赛次（如：半决赛/决赛/小组赛等）",
+  "start_time": "开始时间，格式2026-MM-DDTHH:mm:ss+08:00",
+  "end_time": "结束时间，格式2026-MM-DDTHH:mm:ss+08:00（如无则start+1小时）",
+  "is_medal_event": true/false
+}
+
+只返回 JSON 数组，不要其他文字。如果无法解析出任何赛事，返回空数组 []。`;
+
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':apiKey,
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
+      body:JSON.stringify({
+        model:'claude-opus-4-5',
+        max_tokens:4096,
+        messages:[{role:'user',content:prompt}]
+      })
+    });
+    if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||`API错误 ${resp.status}`);}
+    const data=await resp.json();
+    const txt=data.content[0].text.trim();
+    const jsonMatch=txt.match(/\[[\s\S]*\]/);
+    if(!jsonMatch) throw new Error('AI 返回内容无法解析为 JSON');
+    _aiParsedEvents=JSON.parse(jsonMatch[0]);
+    document.getElementById('fileStatus').innerHTML=`<span style="color:var(--ok)">✓ AI 解析完成，发现 ${_aiParsedEvents.length} 条赛事</span>`;
+    renderAiResult(_aiParsedEvents, fileName);
+    await logAction('import','events',`AI解析文件 [${fileName}] 发现 ${_aiParsedEvents.length} 条赛事`);
+  } catch(e){
+    document.getElementById('fileStatus').innerHTML=`<span style="color:#ef4444">AI分析失败：${e.message}</span>`;
+  }
+}
+
+function renderAiResult(events, fileName){
+  const sec=document.getElementById('aiResultSection');
+  const body=document.getElementById('aiResultBody');
+  document.getElementById('aiResultCnt').textContent=`${events.length} 条`;
+  sec.style.display='';
+  if(!events.length){body.innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">未解析出任何赛事</div>';return;}
+  body.innerHTML=`<div class="table-wrap"><table style="font-size:11px">
+    <tr><th style="width:32px">#</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>金牌</th></tr>
+    ${events.map((e,i)=>{
+      const v=VENUES.find(x=>x.id===e.venue_id);
+      const st=e.start_time?new Date(e.start_time).toLocaleString('zh',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'?';
+      const et=e.end_time?new Date(e.end_time).toLocaleString('zh',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}):'?';
+      return `<tr>
+        <td class="mono" style="color:var(--t3)">${i+1}</td>
+        <td style="color:var(--t1);max-width:220px">${e.name||'—'}</td>
+        <td>${v?`<span style="color:var(--acl)">${v.short_name||v.name}</span>`:'<span style="color:#ef4444">未匹配</span>'}</td>
+        <td><span class="badge">${e.round||'—'}</span></td>
+        <td class="mono">${st}</td><td class="mono">${et}</td>
+        <td style="text-align:center">${e.is_medal_event?'🥇':''}</td>
+      </tr>`;
+    }).join('')}
+  </table></div>`;
+}
+
+async function confirmAiImport(){
+  if(!_aiParsedEvents.length){alert('没有可导入的数据');return;}
+  const btn=event.target;btn.disabled=true;btn.textContent='导入中…';
+  let ok=0,fail=0;
+  const toInsert=_aiParsedEvents.map(e=>({
+    id: crypto.randomUUID(),
+    venue_id: e.venue_id||null,
+    name: e.name||'未命名',
+    round: e.round||'',
+    is_medal_event: !!e.is_medal_event,
+    start_time: e.start_time?new Date(e.start_time).getTime():null,
+    end_time: e.end_time?new Date(e.end_time).getTime():null,
+    status:'scheduled',participants:[],is_imported:true,import_source:'ai_import'
+  })).filter(e=>e.start_time);
+  // Batch insert
+  for(let i=0;i<toInsert.length;i+=50){
+    const {error}=await db.from('events').insert(toInsert.slice(i,i+50));
+    if(error) fail+=Math.min(50,toInsert.length-i);
+    else ok+=Math.min(50,toInsert.length-i);
+  }
+  await logAction('import','events',`AI导入完成：成功 ${ok} 条，失败 ${fail} 条`);
+  btn.disabled=false;btn.textContent='✓ 确认导入数据库';
+  alert(`导入完成：成功 ${ok} 条${fail?`，失败 ${fail} 条`:''}。`);
+  document.getElementById('aiResultSection').style.display='none';
+  _aiParsedEvents=[];
+  loadImportHist();
 }
 async function loadImportHist(){
   const {data}=await db.from('import_history').select('*').order('created_at',{ascending:false}).limit(10);
@@ -808,194 +1053,269 @@ async function renderExport(){
   document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
   await loadVenueMap();
   const {data:evs}=await db.from('events').select('*').order('start_time');
-  const events=evs||[];
-  document.getElementById('pageSub').textContent=`共 ${events.length} 条`;
-  document.getElementById('pageActions').innerHTML=`
-    <button class="btn btn-primary" onclick="exportReport('all')">📄 导出完整报表</button>
-    <button class="btn btn-ghost" onclick="exportReport('today')">今日赛程</button>
-    <button class="btn btn-ghost" onclick="exportReport('medal')">金牌赛事</button>`;
-  // Group by date for preview
-  const groups={};
-  events.forEach(e=>{
-    const d=new Date(e.start_time);
-    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-    if(!groups[key])groups[key]=[];
-    groups[key].push(e);
-  });
-  const today=new Date();const todayKey=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+  const allEvents=evs||[];
+  window._allEventsExport=allEvents;
+  // Get unique dates
+  const dateSet=new Set();
+  allEvents.forEach(e=>{const d=new Date(e.start_time);dateSet.add(`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`)});
+  const dates=[...dateSet].sort();
+  document.getElementById('pageSub').textContent=`共 ${allEvents.length} 条`;
+  document.getElementById('pageActions').innerHTML='';
   document.getElementById('content').innerHTML=`
     <div class="section" style="margin-bottom:20px">
-      <div class="sec-head">
-        <span class="sec-title">报表设置</span>
-        <div class="sec-actions">
-          <button class="btn btn-primary" onclick="exportReport('all')">📄 导出完整报表</button>
-          <button class="btn btn-ghost" onclick="exportReport('today')">今日赛程</button>
-          <button class="btn btn-ghost" onclick="exportReport('medal')">金牌赛事报表</button>
-        </div>
-      </div>
-      <div style="padding:20px;display:flex;gap:20px;flex-wrap:wrap">
-        <div style="flex:1;min-width:200px">
-          <div style="font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;font-weight:700;letter-spacing:.08em">报表格式</div>
-          <div style="font-size:12px;color:var(--t2);line-height:2">✓ 标题栏：系统名称、导出时间<br>✓ 数据表：按日期分组，统一格式<br>✓ 汇总栏：各类统计数字<br>✓ 导出为可打印 HTML</div>
-        </div>
-        <div style="flex:1;min-width:200px">
-          <div style="font-size:11px;color:var(--t3);margin-bottom:6px;text-transform:uppercase;font-weight:700;letter-spacing:.08em">数据概况</div>
-          <div style="font-size:12px;color:var(--t2);line-height:2">总赛事：${events.length} 条<br>今日赛事：${(groups[todayKey]||[]).length} 条<br>金牌赛事：${events.filter(e=>e.is_medal_event).length} 条<br>共 ${Object.keys(groups).length} 个赛事日</div>
-        </div>
-      </div>
-    </div>
-    <div class="section">
-      <div class="sec-head"><span class="sec-title">赛程预览（按日期分组）</span></div>
-      ${Object.entries(groups).map(([date,evts])=>`
-        <div style="padding:10px 20px;border-bottom:1px solid var(--b1)">
-          <div style="font-size:11px;font-weight:700;color:var(--acl);margin-bottom:6px;display:flex;align-items:center;gap:8px">
-            <span>${date}${date===todayKey?' 📍今天':''}</span>
-            <span style="font-weight:400;color:var(--t3)">${evts.length} 场</span>
-            ${evts.filter(e=>e.is_medal_event).length?`<span style="color:#fbbf24">🥇 ${evts.filter(e=>e.is_medal_event).length} 枚金牌</span>`:''}
+      <div class="sec-head"><span class="sec-title">导出设置</span></div>
+      <div style="padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:24px">
+        <div>
+          <div class="field">
+            <label>报表类型</label>
+            <div style="display:flex;gap:8px">
+              <button id="rtype-sched" class="btn btn-primary" onclick="setRtype('schedule')">📋 赛程表</button>
+              <button id="rtype-trans" class="btn btn-ghost" onclick="setRtype('transmission')">📡 传送表</button>
+            </div>
+            <div id="rtype-desc" style="margin-top:8px;font-size:11px;color:var(--t3)">赛程表：完整赛事日程，忠实反映赛程全貌</div>
           </div>
-          <div class="table-wrap"><table style="font-size:11px">
-            <tr><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th></tr>
-            ${evts.map(ev=>`<tr>
-              <td style="color:var(--t1)">${ev.is_medal_event?'🥇 ':''}${ev.name}</td>
-              <td>${VENUES.find(v=>v.id===ev.venue_id)?.short_name||'—'}</td>
-              <td><span class="badge">${ev.round}</span></td>
-              <td class="mono">${fmtDT(ev.start_time)}</td>
-              <td class="mono">${fmtDT(ev.end_time)}</td>
-              <td>${statusBadge(ev.status)}</td>
-            </tr>`).join('')}
-          </table></div>
-        </div>`).join('')}
+          <div class="field">
+            <label>日期选择</label>
+            <select id="exp-date" onchange="updateExportPreview()" style="width:100%;padding:9px 12px;background:var(--surf);border:1px solid var(--b2);border-radius:6px;color:var(--t1);font-size:13px;outline:none">
+              <option value="all">全部赛程（${dates.length} 天）</option>
+              ${dates.map(d=>{const dt=new Date(d+'T00:00:00');return `<option value="${d}">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日</option>`;}).join('')}
+            </select>
+          </div>
+          <div class="field">
+            <label>导出格式</label>
+            <div style="display:flex;gap:8px">
+              <button id="fmt-excel" class="btn btn-primary" onclick="setFmt('excel')">📊 Excel</button>
+              <button id="fmt-pdf" class="btn btn-ghost" onclick="setFmt('pdf')">🖨️ PDF打印</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;padding:10px;font-size:13px" onclick="doExport()">⬇️ 生成导出</button>
+        </div>
+        <div style="padding:4px 0">
+          <div style="font-size:11px;color:var(--t3);font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px">数据概况</div>
+          <div style="font-size:12px;color:var(--t2);line-height:2.4">
+            <div>总赛事：<strong style="color:var(--t1)">${allEvents.length}</strong> 条</div>
+            <div>赛事天数：<strong style="color:var(--t1)">${dates.length}</strong> 天</div>
+            <div>日期范围：<strong style="color:var(--t1);font-size:11px">${dates[0]||'—'} ~ ${dates[dates.length-1]||'—'}</strong></div>
+            <div>团体项目：<strong style="color:var(--acl)">${allEvents.filter(e=>isTeamEvent(e)).length}</strong> 条 <span style="color:var(--t3);font-size:10px">（传送表 -10分钟）</span></div>
+            <div>个人项目：<strong style="color:var(--acl)">${allEvents.filter(e=>!isTeamEvent(e)).length}</strong> 条 <span style="color:var(--t3);font-size:10px">（传送表 -5分钟）</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="section" id="exp-preview">
+      <div class="sec-head"><span class="sec-title" id="preview-title">预览 — 赛程表</span><span class="sec-cnt" id="preview-cnt">${allEvents.length} 条</span></div>
+      <div id="preview-body"></div>
     </div>`;
-  window._allEventsExport=events;
-  window._venueMapExport=VENUES;
+  window._exportRtype='schedule';
+  window._exportFmt='excel';
+  updateExportPreview();
 }
 
-async function exportReport(type){
-  await loadVenueMap();
-  const {data:evs}=await db.from('events').select('*').order('start_time');
-  let events=evs||[];
-  const today=new Date();const todayKey=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+function setRtype(t){
+  window._exportRtype=t;
+  document.getElementById('rtype-sched').className='btn '+(t==='schedule'?'btn-primary':'btn-ghost');
+  document.getElementById('rtype-trans').className='btn '+(t==='transmission'?'btn-primary':'btn-ghost');
+  document.getElementById('rtype-desc').textContent=t==='schedule'?'赛程表：完整赛事日程，忠实反映赛程全貌':'传送表：含转播提示时间（单项 -5分钟，团体 -10分钟）';
+  updateExportPreview();
+}
 
-  let title='亚沙会转播赛程报表';
-  if(type==='today'){
-    events=events.filter(e=>{const d=new Date(e.start_time);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`===todayKey;});
-    title='今日转播赛程报表';
-  } else if(type==='medal'){
-    events=events.filter(e=>e.is_medal_event);
-    title='金牌赛事转播报表';
-  }
+function setFmt(f){
+  window._exportFmt=f;
+  document.getElementById('fmt-excel').className='btn '+(f==='excel'?'btn-primary':'btn-ghost');
+  document.getElementById('fmt-pdf').className='btn '+(f==='pdf'?'btn-primary':'btn-ghost');
+}
 
+function updateExportPreview(){
+  const rtype=window._exportRtype||'schedule';
+  const dateFilter=document.getElementById('exp-date')?.value||'all';
+  let events=(window._allEventsExport||[]).slice();
+  if(dateFilter!=='all') events=events.filter(e=>{const d=new Date(e.start_time);return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`===dateFilter;});
+  document.getElementById('preview-title').textContent=`预览 — ${rtype==='schedule'?'赛程表':'传送表'}`;
+  document.getElementById('preview-cnt').textContent=`${events.length} 条`;
   const groups={};
-  events.forEach(e=>{
-    const d=new Date(e.start_time);
-    const key=`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`;
-    if(!groups[key])groups[key]=[];
-    groups[key].push(e);
-  });
-  const exportDt=`${today.getFullYear()}年${today.getMonth()+1}月${today.getDate()}日 ${String(today.getHours()).padStart(2,'0')}:${String(today.getMinutes()).padStart(2,'0')}`;
-  const totalMedal=events.filter(e=>e.is_medal_event).length;
-  const totalLive=events.filter(e=>e.status==='live').length;
-  const totalDone=events.filter(e=>e.status==='finished'||e.status==='completed').length;
-
-  const vMap={};VENUES.forEach(v=>vMap[v.id]=v);
-  function statusText(s){return {live:'直播中',scheduled:'计划中',finished:'已完成',completed:'已完成',cancelled:'已取消'}[s]||s;}
-
-  const html=`<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8"><title>${title}</title>
-<style>
-  *{box-sizing:border-box;margin:0;padding:0}
-  body{font-family:'Microsoft YaHei',Arial,sans-serif;font-size:13px;color:#1a202c;background:#fff;padding:20px}
-  .report-wrap{max-width:1100px;margin:0 auto}
-  /* ── HEADER ── */
-  .rpt-header{background:linear-gradient(135deg,#1e3a5f,#2d5a8e);color:#fff;padding:24px 32px;border-radius:8px 8px 0 0;margin-bottom:0}
-  .rpt-title{font-size:22px;font-weight:700;letter-spacing:.06em}
-  .rpt-sub{font-size:12px;opacity:.75;margin-top:4px;letter-spacing:.04em}
-  .rpt-meta{display:flex;gap:24px;margin-top:16px;flex-wrap:wrap}
-  .rpt-meta-item{font-size:11px;opacity:.8}
-  .rpt-meta-item span{font-weight:700;font-size:14px;display:block;margin-bottom:2px;color:#90cdf4}
-  /* ── STATS BAR ── */
-  .rpt-stats{display:flex;background:#f7fafc;border:1px solid #e2e8f0;border-top:none;padding:12px 32px;gap:32px}
-  .rpt-stat{text-align:center}
-  .rpt-stat-num{font-size:20px;font-weight:700;color:#2d3748}
-  .rpt-stat-lbl{font-size:10px;color:#718096;text-transform:uppercase;letter-spacing:.06em;margin-top:2px}
-  /* ── TABLE ── */
-  .rpt-section{margin-bottom:0}
-  .rpt-date-hdr{background:#2d5a8e;color:#fff;padding:8px 20px;font-size:12px;font-weight:700;letter-spacing:.06em;display:flex;align-items:center;gap:12px}
-  .rpt-date-badge{background:rgba(255,255,255,.2);padding:2px 8px;border-radius:3px;font-size:10px}
-  table{width:100%;border-collapse:collapse}
-  th{padding:8px 16px;text-align:left;font-size:10px;font-weight:700;color:#4a5568;background:#f7fafc;text-transform:uppercase;letter-spacing:.08em;border:1px solid #e2e8f0}
-  td{padding:9px 16px;border:1px solid #e2e8f0;vertical-align:middle;font-size:12px;color:#2d3748}
-  tr:nth-child(even) td{background:#f7fafc}
-  .medal-row td{background:#fffbeb!important;border-left:3px solid #f6ad55}
-  .badge-live{background:#fed7d7;color:#c53030;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600}
-  .badge-sched{background:#bee3f8;color:#2b6cb0;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600}
-  .badge-done{background:#e2e8f0;color:#4a5568;padding:2px 8px;border-radius:3px;font-size:10px;font-weight:600}
-  /* ── FOOTER ── */
-  .rpt-footer{background:#2d3748;color:#a0aec0;padding:16px 32px;border-radius:0 0 8px 8px;display:flex;justify-content:space-between;align-items:center;font-size:11px}
-  .rpt-footer strong{color:#e2e8f0}
-  @media print{body{padding:0}.report-wrap{max-width:100%}.rpt-header{border-radius:0}.rpt-footer{border-radius:0}}
-</style></head><body>
-<div class="report-wrap">
-  <div class="rpt-header">
-    <div class="rpt-title">🏖️ ${title}</div>
-    <div class="rpt-sub">2025年三亚亚洲沙滩运动会 · 亚沙会智慧转播赛程管理系统</div>
-    <div class="rpt-meta">
-      <div class="rpt-meta-item"><span>${events.length}</span>总赛事数</div>
-      <div class="rpt-meta-item"><span>${Object.keys(groups).length}</span>赛事天数</div>
-      <div class="rpt-meta-item"><span>${totalMedal}</span>金牌赛事</div>
-      <div class="rpt-meta-item"><span>${exportDt}</span>导出时间</div>
-    </div>
-  </div>
-  <div class="rpt-stats">
-    <div class="rpt-stat"><div class="rpt-stat-num">${events.length}</div><div class="rpt-stat-lbl">总赛事</div></div>
-    <div class="rpt-stat"><div class="rpt-stat-num" style="color:#c53030">${totalLive}</div><div class="rpt-stat-lbl">直播中</div></div>
-    <div class="rpt-stat"><div class="rpt-stat-num" style="color:#276749">${totalDone}</div><div class="rpt-stat-lbl">已完成</div></div>
-    <div class="rpt-stat"><div class="rpt-stat-num" style="color:#d97706">${totalMedal}</div><div class="rpt-stat-lbl">金牌赛次</div></div>
-    <div class="rpt-stat"><div class="rpt-stat-num">${Object.keys(groups).length}</div><div class="rpt-stat-lbl">赛事日</div></div>
-  </div>
-  ${Object.entries(groups).map(([date,evts])=>`
-  <div class="rpt-section">
-    <div class="rpt-date-hdr">
-      📅 ${date}
-      <span class="rpt-date-badge">共 ${evts.length} 场</span>
-      ${evts.filter(e=>e.is_medal_event).length?`<span class="rpt-date-badge">🥇 ${evts.filter(e=>e.is_medal_event).length} 枚金牌</span>`:''}
-    </div>
-    <table>
-      <tr><th>#</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>时长</th><th>转播频道</th><th>状态</th></tr>
-      ${evts.map((ev,i)=>{
-        const dur=Math.round((ev.end_time-ev.start_time)/60000);
-        const venue=vMap[ev.venue_id];
-        const sText=statusText(ev.status);
-        const sBadge=ev.status==='live'?'badge-live':ev.status==='scheduled'?'badge-sched':'badge-done';
-        const d=new Date(ev.start_time),de=new Date(ev.end_time);
-        const fmt=t=>`${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-        return `<tr class="${ev.is_medal_event?'medal-row':''}">
-          <td style="color:#a0aec0;font-size:11px">${i+1}</td>
-          <td style="font-weight:600">${ev.is_medal_event?'🥇 ':''}${ev.name}</td>
-          <td>${venue?.short_name||venue?.name||'—'}</td>
+  events.forEach(e=>{const d=new Date(e.start_time);const k=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;if(!groups[k])groups[k]=[];groups[k].push(e);});
+  let html='';
+  Object.entries(groups).forEach(([date,evts])=>{
+    const dt=new Date(date+'T00:00:00');
+    html+=`<div style="padding:8px 20px 4px;border-bottom:1px solid var(--b1)">
+      <div style="font-size:11px;font-weight:700;color:var(--acl);margin-bottom:4px">${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日 · ${evts.length}场</div>
+      <div class="table-wrap"><table style="font-size:11px">`;
+    if(rtype==='transmission'){
+      html+=`<tr><th>提示时间</th><th>提前量</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>类型</th></tr>`;
+    } else {
+      html+=`<tr><th>#</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>时长</th></tr>`;
+    }
+    evts.forEach((ev,i)=>{
+      const st=new Date(ev.start_time),en=new Date(ev.end_time);
+      const fmt=t=>`${p2(t.getHours())}:${p2(t.getMinutes())}`;
+      const dur=Math.round((en-st)/60000);
+      const team=isTeamEvent(ev);
+      const cueMin=team?-10:-5;
+      const cueT=new Date(st.getTime()+cueMin*60000);
+      const venue=VENUES.find(v=>v.id===ev.venue_id);
+      if(rtype==='transmission'){
+        html+=`<tr><td class="mono" style="color:#f59e0b;font-weight:700">${fmt(cueT)}</td>
+          <td style="color:#f59e0b;font-size:10px">${cueMin}分钟</td>
+          <td style="color:var(--t1)">${ev.name}</td>
+          <td>${venue?.short_name||'—'}</td>
           <td>${ev.round||'—'}</td>
-          <td>${fmt(d)}</td>
-          <td>${fmt(de)}</td>
-          <td style="color:#718096">${dur}分钟</td>
-          <td style="color:#4a5568">${ev.broadcast_channel||'—'}</td>
-          <td><span class="${sBadge}">${sText}</span></td>
+          <td class="mono">${fmt(st)}</td>
+          <td class="mono">${fmt(en)}</td>
+          <td><span class="badge ${team?'up':'sched'}">${team?'团体':'个人'}</span></td>
         </tr>`;
-      }).join('')}
-    </table>
-  </div>`).join('')}
-  <div class="rpt-footer">
-    <div>Live-CUE · 亚沙会智慧转播赛程管理系统 &nbsp;|&nbsp; 2025年三亚亚洲沙滩运动会</div>
-    <div>导出时间：<strong>${exportDt}</strong> &nbsp;|&nbsp; 数据条目：<strong>${events.length}</strong> 条</div>
-  </div>
-</div>
-</body></html>`;
-
-  const blob=new Blob([html],{type:'text/html;charset=utf-8'});
-  const url=URL.createObjectURL(blob);
-  const a=document.createElement('a');
-  a.href=url;a.download=`${title}-${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}.html`;
-  a.click();URL.revokeObjectURL(url);
+      } else {
+        html+=`<tr><td style="color:var(--t3)">${i+1}</td>
+          <td style="color:var(--t1)">${ev.name}</td>
+          <td>${venue?.short_name||'—'}</td>
+          <td>${ev.round||'—'}</td>
+          <td class="mono">${fmt(st)}</td>
+          <td class="mono">${fmt(en)}</td>
+          <td style="color:var(--t3)">${dur}分钟</td>
+        </tr>`;
+      }
+    });
+    html+=`</table></div></div>`;
+  });
+  if(!html) html='<div style="padding:40px;text-align:center;color:var(--t3)">暂无数据</div>';
+  document.getElementById('preview-body').innerHTML=html;
 }
+
+async function doExport(){
+  await loadVenueMap();
+  const rtype=window._exportRtype||'schedule';
+  const fmt=window._exportFmt||'excel';
+  const dateFilter=document.getElementById('exp-date')?.value||'all';
+  let events=(window._allEventsExport||[]).slice();
+  if(dateFilter!=='all') events=events.filter(e=>{const d=new Date(e.start_time);return `${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`===dateFilter;});
+  const now=new Date();
+  const nowStr=`${now.getFullYear()}年${now.getMonth()+1}月${now.getDate()}日 ${p2(now.getHours())}:${p2(now.getMinutes())}`;
+  const rtypeLabel=rtype==='schedule'?'赛程表':'传送表';
+  const dateLabel=dateFilter==='all'?'全赛程':(()=>{const dt=new Date(dateFilter+'T00:00:00');return `${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`;})();
+  const fileName=`第六届亚洲沙滩运动会_${rtypeLabel}_${dateLabel}`;
+  if(fmt==='excel') exportAsExcel(events,rtype,fileName,nowStr,dateLabel);
+  else exportAsPdf(events,rtype,fileName,nowStr,dateLabel);
+}
+
+function exportAsExcel(events,rtype,fileName,nowStr,dateLabel){
+  if(typeof XLSX==='undefined'){alert('Excel库未加载，请刷新页面重试');return;}
+  const WB=XLSX.utils.book_new();
+  const isT=(rtype==='transmission');
+  const groups={};
+  events.forEach(e=>{const d=new Date(e.start_time);const k=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;if(!groups[k])groups[k]=[];groups[k].push(e);});
+  const dateKeys=Object.keys(groups);
+  dateKeys.forEach((date,pageIdx)=>{
+    const evts=groups[date];
+    const dt=new Date(date+'T00:00:00');
+    const sheetName=`${dt.getMonth()+1}月${dt.getDate()}日`;
+    const rows=[];
+    rows.push(['第六届亚洲沙滩运动会 The 6th Asian Beach Games · Sanya 2025','','','','','','','','']);
+    rows.push([isT?'传 送 表':'赛 程 表',`日期：${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`,'',`共 ${evts.length} 场`,'',`第 ${pageIdx+1} 页 / 共 ${dateKeys.length} 页`,'',`导出时间：${nowStr}`,'']);
+    rows.push([]);
+    if(isT) rows.push(['提示时间','提前量','赛事名称','场馆','赛次','开始时间','结束时间','时长(分钟)','类型']);
+    else rows.push(['序号','赛事名称','场馆','赛次','开始时间','结束时间','时长(分钟)','状态','备注']);
+    evts.forEach((ev,i)=>{
+      const st=new Date(ev.start_time),en=new Date(ev.end_time);
+      const fmtT=t=>`${p2(t.getHours())}:${p2(t.getMinutes())}`;
+      const dur=Math.round((en-st)/60000);
+      const venue=VENUES.find(v=>v.id===ev.venue_id);
+      const team=isTeamEvent(ev);
+      const cueMin=team?-10:-5;
+      const cueT=new Date(st.getTime()+cueMin*60000);
+      const statusMap={live:'直播中',scheduled:'计划中',finished:'已完成',completed:'已完成',cancelled:'已取消'};
+      if(isT) rows.push([fmtT(cueT),`${cueMin}分钟`,ev.name,venue?.short_name||venue?.name||'—',ev.round||'—',fmtT(st),fmtT(en),dur,team?'团体':'个人']);
+      else rows.push([i+1,ev.name,venue?.short_name||venue?.name||'—',ev.round||'—',fmtT(st),fmtT(en),dur,statusMap[ev.status]||ev.status||'—',ev.notes||'']);
+    });
+    rows.push([]);
+    rows.push(['第六届亚洲沙滩运动会 · Live-CUE 赛程管理系统','','','','','','','','']);
+    const WS=XLSX.utils.aoa_to_sheet(rows);
+    WS['!cols']=isT?[{wch:9},{wch:8},{wch:32},{wch:16},{wch:14},{wch:9},{wch:9},{wch:10},{wch:7}]:[{wch:6},{wch:32},{wch:16},{wch:14},{wch:9},{wch:9},{wch:10},{wch:9},{wch:18}];
+    XLSX.utils.book_append_sheet(WB,WS,sheetName);
+  });
+  // Summary sheet
+  const sRows=[['第六届亚洲沙滩运动会','','',''],
+    [isT?'传送表':'赛程表','汇总统计','',`导出时间：${nowStr}`],
+    [],['日期','赛事总数','团体','个人']];
+  dateKeys.forEach(date=>{
+    const dt=new Date(date+'T00:00:00');
+    const evts=groups[date];
+    const tc=evts.filter(e=>isTeamEvent(e)).length;
+    sRows.push([`${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`,evts.length,tc,evts.length-tc]);
+  });
+  sRows.push([]);
+  const tc=events.filter(e=>isTeamEvent(e)).length;
+  sRows.push(['合计',events.length,tc,events.length-tc]);
+  const SWS=XLSX.utils.aoa_to_sheet(sRows);
+  SWS['!cols']=[{wch:22},{wch:10},{wch:8},{wch:8}];
+  XLSX.utils.book_append_sheet(WB,SWS,'汇总');
+  XLSX.writeFile(WB,`${fileName}.xlsx`);
+}
+
+function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
+  const isT=(rtype==='transmission');
+  const groups={};
+  events.forEach(e=>{const d=new Date(e.start_time);const k=`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;if(!groups[k])groups[k]=[];groups[k].push(e);});
+  const dateKeys=Object.keys(groups);
+  const thRow=isT?`<tr><th>提示时间</th><th>提前量</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>时长</th><th>类型</th></tr>`
+    :`<tr><th>#</th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>时长</th></tr>`;
+  const pagesHtml=dateKeys.map((date,pageIdx)=>{
+    const evts=groups[date];
+    const dt=new Date(date+'T00:00:00');
+    const dateStr=`${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`;
+    const tbodyHtml=evts.map((ev,i)=>{
+      const st=new Date(ev.start_time),en=new Date(ev.end_time);
+      const fmtT=t=>`${p2(t.getHours())}:${p2(t.getMinutes())}`;
+      const dur=Math.round((en-st)/60000);
+      const venue=VENUES.find(v=>v.id===ev.venue_id);
+      const team=isTeamEvent(ev);
+      const cueMin=team?-10:-5;
+      const cueT=new Date(st.getTime()+cueMin*60000);
+      if(isT) return `<tr class="${team?'team-row':''}"><td class="cue-t">${fmtT(cueT)}</td><td class="cue-o">${cueMin}分钟</td><td class="ev-n">${ev.name}</td><td>${venue?.short_name||'—'}</td><td>${ev.round||'—'}</td><td>${fmtT(st)}</td><td>${fmtT(en)}</td><td>${dur}分</td><td><span class="tag ${team?'tg-t':'tg-i'}">${team?'团体':'个人'}</span></td></tr>`;
+      return `<tr><td style="color:#9ca3af">${i+1}</td><td class="ev-n">${ev.name}</td><td>${venue?.short_name||'—'}</td><td>${ev.round||'—'}</td><td>${fmtT(st)}</td><td>${fmtT(en)}</td><td>${dur}分</td></tr>`;
+    }).join('');
+    return `<div class="pg">
+      <header class="ph">
+        <div class="ph-top"><div class="ph-ico">🏖️</div>
+          <div class="ph-txt"><div class="ph-main">第六届亚洲沙滩运动会</div><div class="ph-sub">The 6th Asian Beach Games · Sanya 2025</div></div>
+          <div class="ph-rt"><div class="ph-type">${isT?'传 送 表':'赛 程 表'}</div><div class="ph-date">${dateStr}</div></div>
+        </div>
+        <div class="ph-div"></div>
+        <div class="ph-info"><span>导出时间：${nowStr}</span><span>第 ${pageIdx+1} 页 / 共 ${dateKeys.length} 页</span><span>本页赛事：${evts.length} 场</span></div>
+      </header>
+      <table><thead>${thRow}</thead><tbody>${tbodyHtml}</tbody></table>
+      <footer class="pf"><span>第六届亚洲沙滩运动会 · Live-CUE 赛程管理系统</span><span>${dateStr} · 第 ${pageIdx+1} 页</span></footer>
+    </div>`;
+  }).join('');
+  const html=`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>${fileName}</title><style>
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:'Microsoft YaHei','Heiti SC',Arial,sans-serif;font-size:12px;color:#1a202c;background:#f0f4f8}
+.pg{background:#fff;max-width:1050px;margin:20px auto;box-shadow:0 2px 12px rgba(0,0,0,.1);page-break-after:always}
+.ph{background:linear-gradient(135deg,#1e3a5f,#2563eb);color:#fff;padding:16px 24px 0}
+.ph-top{display:flex;align-items:center;gap:14px;padding-bottom:12px}
+.ph-ico{font-size:28px}.ph-txt{flex:1}
+.ph-main{font-size:20px;font-weight:700;letter-spacing:.1em}.ph-sub{font-size:10px;opacity:.7;margin-top:2px;letter-spacing:.06em}
+.ph-rt{text-align:right}.ph-type{font-size:16px;font-weight:700;letter-spacing:.2em;background:rgba(255,255,255,.2);padding:4px 14px;border-radius:4px;display:inline-block}
+.ph-date{font-size:11px;opacity:.8;margin-top:4px}
+.ph-div{height:1px;background:rgba(255,255,255,.2)}
+.ph-info{display:flex;justify-content:space-between;padding:6px 0 10px;font-size:10px;opacity:.75;letter-spacing:.04em}
+table{width:100%;border-collapse:collapse}thead tr{background:#1e3a5f;color:#fff}
+th{padding:8px 12px;text-align:left;font-size:10px;font-weight:700;letter-spacing:.08em;white-space:nowrap}
+td{padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:11px;vertical-align:middle}
+tr:nth-child(even) td{background:#f9fafb}tr:hover td{background:#eff6ff}
+.ev-n{font-weight:600;color:#111827;max-width:220px}
+.cue-t{font-weight:700;color:#dc2626;font-family:monospace;font-size:13px}.cue-o{color:#dc2626;font-weight:600;font-size:10px}
+.team-row td{background:#fef3c7!important}
+.tag{display:inline-block;padding:1px 7px;border-radius:3px;font-size:9px;font-weight:700;letter-spacing:.06em}
+.tg-t{background:#fde68a;color:#92400e}.tg-i{background:#dbeafe;color:#1e40af}
+.pf{display:flex;justify-content:space-between;padding:10px 24px;background:#f1f5f9;border-top:2px solid #1e3a5f;font-size:10px;color:#6b7280}
+@media print{body{background:#fff}.pg{margin:0;box-shadow:none;max-width:100%}.pg+.pg{page-break-before:always}}
+</style></head><body>${pagesHtml}</body></html>`;
+  const w=window.open('','_blank','width=1100,height=800,scrollbars=yes');
+  if(!w){alert('请允许弹出窗口以生成PDF预览');return;}
+  w.document.write(html);w.document.close();
+  setTimeout(()=>w.print(),800);
+}
+
+/* legacy stub – kept for any old references */
+async function exportReport(type){await renderExport();}
 
 /* ── AUDIT ── */
 async function renderAudit(){
