@@ -1031,11 +1031,63 @@ function renderScheduleView(){
         innerHtml=`<div class="ev-cards">${sortedEvts.map(ev=>buildEvCard(ev,vc,true)).join('')}</div>`;
       }
     } else {
-      // ── All venues: flat grid, show venue name + court badge on card ──
-      innerHtml=`<div class="ev-cards">${sortedEvts.map(ev=>{
-        const venue=VENUES.find(v=>v.id===ev.venue_id);
-        return buildEvCard(ev,venue?.color||'#3b82f6',false);
-      }).join('')}</div>`;
+      // ── All venues: group by venue, then by court within each venue ──
+      const venueGroups={};
+      sortedEvts.forEach(e=>{
+        if(!venueGroups[e.venue_id]) venueGroups[e.venue_id]=[];
+        venueGroups[e.venue_id].push(e);
+      });
+      // Keep venue order from VENUES array
+      const orderedVids=VENUES.map(v=>v.id).filter(vid=>venueGroups[vid]);
+      innerHtml=orderedVids.map(vid=>{
+        const venue=VENUES.find(v=>v.id===vid);
+        const vc=venue?.color||'#3b82f6';
+        const vEvts=venueGroups[vid];
+        const hasCourts=vEvts.some(e=>parseCourtNotes(e.notes).court);
+        if(!hasCourts){
+          // Single-court or no court: flat row with venue label
+          return `<div class="ev-court-lane" style="--vc:${vc}">
+            <div class="ev-court-hdr">
+              <span class="ev-court-tag" style="background:${vc}18;border-color:${vc}44;color:${vc}">${venue?.name||vid}</span>
+              <div class="ev-court-line"></div>
+              <span style="font-size:10px;color:var(--t3);flex-shrink:0">${vEvts.length}场</span>
+            </div>
+            <div class="ev-court-cards">${vEvts.map(ev=>buildEvCard(ev,vc,true)).join('')}</div>
+          </div>`;
+        }
+        // Multi-court: sub-lanes per court
+        const courtGroups={};
+        vEvts.forEach(e=>{
+          const {court}=parseCourtNotes(e.notes);
+          const k=court||'__none__';
+          if(!courtGroups[k]) courtGroups[k]=[];
+          courtGroups[k].push(e);
+        });
+        const keys=Object.keys(courtGroups).sort((a,b)=>{
+          if(a==='__none__') return 1; if(b==='__none__') return -1;
+          return a.localeCompare(b,'zh');
+        });
+        const lanesHtml=keys.map(k=>{
+          const label=k==='__none__'?'其他场地':k;
+          const cards=courtGroups[k].map(ev=>buildEvCard(ev,vc,true)).join('');
+          return `<div class="ev-court-lane" style="--vc:${vc};margin-bottom:8px;padding-left:12px;border-left:2px solid ${vc}33">
+            <div class="ev-court-hdr" style="margin-bottom:6px">
+              <span class="ev-court-tag" style="font-size:9px;background:${vc}12;border-color:${vc}33;color:${vc}">${label}</span>
+              <div class="ev-court-line"></div>
+              <span style="font-size:10px;color:var(--t3);flex-shrink:0">${courtGroups[k].length}场</span>
+            </div>
+            <div class="ev-court-cards">${cards}</div>
+          </div>`;
+        }).join('');
+        return `<div style="margin-bottom:14px">
+          <div class="ev-court-hdr" style="margin-bottom:8px">
+            <span class="ev-court-tag" style="background:${vc}18;border-color:${vc}44;color:${vc}">${venue?.name||vid}</span>
+            <div class="ev-court-line"></div>
+            <span style="font-size:10px;color:var(--t3);flex-shrink:0">${vEvts.length}场</span>
+          </div>
+          ${lanesHtml}
+        </div>`;
+      }).join('');
     }
 
     return `<div class="ev-group">

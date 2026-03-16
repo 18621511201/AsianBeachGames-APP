@@ -182,9 +182,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--t1);
 .vrow::before{content:'';position:absolute;left:0;top:50%;transform:translateY(-50%);width:3px;height:26px;border-radius:0 2px 2px 0;background:var(--vc);opacity:0;transition:opacity .15s}
 .vrow:hover{background:var(--bg-glass)}
 .vrow:hover::before{opacity:1}
+.vrow.vrow-court{background:rgba(255,255,255,.012)}
+.vrow.vrow-court::after{content:'';position:absolute;left:8px;top:0;bottom:0;width:1px;background:var(--vc);opacity:.22}
 .vi{display:flex;flex-direction:column;gap:3px}
 .vn{font-size:12px;font-weight:600;color:var(--t1)}
 .vz{font-size:9px;color:var(--t3)}
+.vcourt-tag{font-size:10px;font-weight:700;color:var(--vc);background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.18);padding:1px 8px;border-radius:3px;display:inline-block;margin-top:2px}
 [data-theme="chinese"] .vn{font-family:var(--serif)}
 [data-theme="fashion"] .vn{font-family:var(--serif);font-weight:400;font-size:13px}
 .gs{flex:1;overflow:auto;position:relative;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.06) transparent}
@@ -792,21 +795,60 @@ function getActiveVenues(){
   return VENUES.filter(v=>ids.has(v.id));
 }
 
+/* ── Court helpers ── */
+function parseCourt(notes){
+  if(!notes) return '';
+  const m=notes.match(/^\[场地:([^\]]+)\]/);
+  return m?m[1].trim():'';
+}
+function getVenueCourts(venueId){
+  const evts=allEvts.filter(e=>e.venue_id===venueId);
+  if(!evts.length) return [''];
+  const courtSet=new Set(evts.map(e=>parseCourt(e.notes)));
+  const named=[...courtSet].filter(Boolean).sort((a,b)=>a.localeCompare(b,'zh'));
+  if(!named.length) return [''];          // all events have no court → single row
+  const hasBucket=courtSet.has('');
+  return [...named, ...(hasBucket?['']:[])]; // named courts first, then unnamed bucket
+}
+
 function renderVenues(){
   const ac=document.getElementById('vlist').scrollTop||0;
   const activeVenues=getActiveVenues();
-  document.getElementById('vlist').innerHTML=activeVenues.map(v=>{
+  let html='';
+  activeVenues.forEach(v=>{
     const icon=getSportIcon(v.short_name||v.name);
-    return `<div class="vrow" style="--vc:${v.color}">
-      <div class="vi" style="flex-direction:row;align-items:center;gap:6px">
-        <span class="vsport">${icon}</span>
-        <div style="display:flex;flex-direction:column;gap:3px;min-width:0">
-          <span class="vn">${getVenueName(v)}</span>
-          <span class="vz">${getVenueSubName(v)}</span>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
+    const courts=getVenueCourts(v.id);
+    const isMulti=courts.length>1||(courts.length===1&&courts[0]!=='');
+    courts.forEach((court,i)=>{
+      const isFirst=i===0;
+      if(isFirst){
+        // Main venue row: always show icon + venue name
+        html+=`<div class="vrow${courts.length>1?' vrow-first':''}" style="--vc:${v.color}">
+          <div class="vi" style="flex-direction:row;align-items:center;gap:6px">
+            <span class="vsport">${icon}</span>
+            <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+              <span class="vn">${getVenueName(v)}</span>
+              ${court
+                ? `<span class="vcourt-tag" style="border-color:${v.color}33;background:${v.color}14;color:${v.color}">${court}</span>`
+                : `<span class="vz">${getVenueSubName(v)}</span>`}
+            </div>
+          </div>
+        </div>`;
+      } else {
+        // Sub-court row: indent, no icon, just court tag
+        html+=`<div class="vrow vrow-court" style="--vc:${v.color}">
+          <div class="vi" style="flex-direction:row;align-items:center;gap:6px;padding-left:30px">
+            <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+              ${court
+                ? `<span class="vcourt-tag" style="border-color:${v.color}33;background:${v.color}14;color:${v.color}">${court}</span>`
+                : `<span class="vz" style="font-style:italic">${isZh?'其他场地':'Other court'}</span>`}
+            </div>
+          </div>
+        </div>`;
+      }
+    });
+  });
+  document.getElementById('vlist').innerHTML=html;
   document.getElementById('vcnt').textContent=isZh?`共${activeVenues.length}个`:`${activeVenues.length} venues`;
   document.getElementById('vlist').scrollTop=ac;
 }
@@ -848,40 +890,46 @@ function renderRows(gw){
   else glStep=1440;
 
   activeVenues.forEach(venue=>{
-    const row=document.createElement('div');
-    row.className='gr'; row.style.width=gw+'px';
-    for(let m=0;m<=totalMins;m+=glStep){
-      const gl=document.createElement('div');gl.className='gl';gl.style.left=(m*PPM)+'px';row.appendChild(gl);
-    }
-    // Events for this venue
-    const vevts=allEvts.filter(e=>e.venue_id===venue.id);
-    vevts.forEach(ev=>{
-      const st=evStatus(ev);
-      if(sf!=='all'&&st!==sf) return;
-      if(selectedRounds.size>0&&!selectedRounds.has(ev.round)) return;
-      const startX=tsToX(ev.start_time);
-      const endX=tsToX(ev.end_time);
-      if(endX<0||startX>gw) return;
-      const left=Math.max(startX,0);
-      const width=Math.max(endX-startX,24);
-      const b=document.createElement('div');
-      b.className=`ev ${st}`;
-      b.style.left=left+'px'; b.style.width=width+'px';
-      b.style.setProperty('--ec',venue.color);
-      styleEvt(b,venue,st);
-      const sh=fmtTs(ev.start_time),eh=fmtTs(ev.end_time);
-      b.innerHTML=`<div class="evi">
-        ${ev.is_medal_event?'<span class="ev-medal">🥇</span>':''}
-        <span class="ev-name">${isZh?ev.name:getEventName(ev.name)}</span>
-        <span class="ev-rnd">${getRoundName(ev.round)}</span>
-        <span class="ev-t">${sh}–${eh}</span>
-      </div>`;
-      b.addEventListener('mouseenter',e=>showTT(e,venue,ev,st));
-      b.addEventListener('mousemove',moveTT);
-      b.addEventListener('mouseleave',hideTT);
-      row.appendChild(b);
+    // Split into one row per court (or single row if no courts defined)
+    const courts=getVenueCourts(venue.id);
+    courts.forEach(court=>{
+      const row=document.createElement('div');
+      row.className='gr'; row.style.width=gw+'px';
+      // Subtle tint for sub-court rows
+      if(court) row.style.background=`${venue.color}08`;
+      for(let m=0;m<=totalMins;m+=glStep){
+        const gl=document.createElement('div');gl.className='gl';gl.style.left=(m*PPM)+'px';row.appendChild(gl);
+      }
+      // Events for this venue + this court slot
+      const vevts=allEvts.filter(e=>e.venue_id===venue.id && parseCourt(e.notes)===(court||''));
+      vevts.forEach(ev=>{
+        const st=evStatus(ev);
+        if(sf!=='all'&&st!==sf) return;
+        if(selectedRounds.size>0&&!selectedRounds.has(ev.round)) return;
+        const startX=tsToX(ev.start_time);
+        const endX=tsToX(ev.end_time);
+        if(endX<0||startX>gw) return;
+        const left=Math.max(startX,0);
+        const width=Math.max(endX-startX,24);
+        const b=document.createElement('div');
+        b.className=`ev ${st}`;
+        b.style.left=left+'px'; b.style.width=width+'px';
+        b.style.setProperty('--ec',venue.color);
+        styleEvt(b,venue,st);
+        const sh=fmtTs(ev.start_time),eh=fmtTs(ev.end_time);
+        b.innerHTML=`<div class="evi">
+          ${ev.is_medal_event?'<span class="ev-medal">🥇</span>':''}
+          <span class="ev-name">${isZh?ev.name:getEventName(ev.name)}</span>
+          <span class="ev-rnd">${getRoundName(ev.round)}</span>
+          <span class="ev-t">${sh}–${eh}</span>
+        </div>`;
+        b.addEventListener('mouseenter',e=>showTT(e,venue,ev,st,court));
+        b.addEventListener('mousemove',moveTT);
+        b.addEventListener('mouseleave',hideTT);
+        row.appendChild(b);
+      });
+      gr.appendChild(row);
     });
-    gr.appendChild(row);
   });
 }
 
@@ -1363,21 +1411,24 @@ function setTheme(t,btn){
 ═══════════════════════════════════════════════ */
 const TT=document.getElementById('tt');
 let lastE=null;
-function showTT(e,v,ev,st){
+function showTT(e,v,ev,st,court){
   lastE=e;
   const sl={live:'🔴 直播中',upcoming:'🟡 即将开始',finished:'⚫ 已完成'};
   const slEn={live:'🔴 Live',upcoming:'🟡 Upcoming',finished:'⚫ Finished'};
   const dur=Math.round((ev.end_time-ev.start_time)/60000);
+  // Strip the [场地:X] prefix so tooltip doesn't show raw encoding
+  const cleanNotes=(ev.notes||'').replace(/^\[场地:[^\]]+\]\s*/,'');
   document.getElementById('ttt').textContent=(ev.is_medal_event?'🥇 ':'')+(isZh?ev.name:getEventName(ev.name));
   document.getElementById('ttb').innerHTML=`
     <div class="tt-row"><span>${isZh?'场馆':'Venue'}</span><span class="tt-val">${getVenueName(v)}</span></div>
+    ${court?`<div class="tt-row"><span>${isZh?'场地':'Court'}</span><span class="tt-val" style="color:var(--al);font-weight:700">${court}</span></div>`:''}
     <div class="tt-row"><span>${isZh?'赛次':'Round'}</span><span class="tt-val">${getRoundName(ev.round)}</span></div>
     <div class="tt-row"><span>${isZh?'开始':'Start'}</span><span class="tt-val">${fmtTs(ev.start_time)}</span></div>
     <div class="tt-row"><span>${isZh?'结束':'End'}</span><span class="tt-val">${fmtTs(ev.end_time)}</span></div>
     <div class="tt-row"><span>${isZh?'时长':'Duration'}</span><span class="tt-val">${dur}${isZh?'分钟':'min'}</span></div>
     <div class="tt-row"><span>${isZh?'状态':'Status'}</span><span class="tt-val">${isZh?sl[st]:slEn[st]}</span></div>
     ${ev.broadcast_channel?`<div class="tt-row"><span>${isZh?'频道':'Channel'}</span><span class="tt-val">${ev.broadcast_channel}</span></div>`:''}
-    ${ev.notes?`<div class="tt-row" style="margin-top:5px"><span style="color:var(--al)">${isZh?'备注':'Note'}</span><span class="tt-val" style="color:var(--al)">${ev.notes}</span></div>`:''}`;
+    ${cleanNotes?`<div class="tt-row" style="margin-top:5px"><span style="color:var(--al)">${isZh?'备注':'Note'}</span><span class="tt-val" style="color:var(--al)">${cleanNotes}</span></div>`:''}`;
   TT.classList.add('show'); moveTT(e);
 }
 function moveTT(e){
