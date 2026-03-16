@@ -161,6 +161,15 @@ tr:hover td{background:var(--gl)}
 .search-select option{background:var(--elev)}
 .search-results{padding:0}
 .sr-empty{padding:32px;text-align:center;color:var(--t3);font-size:12px}
+/* ── BULK ACTION BAR ── */
+.bulk-bar{display:flex;align-items:center;gap:10px;padding:8px 20px;background:rgba(59,130,246,.07);border-bottom:1px solid rgba(59,130,246,.18);animation:blin .15s ease;flex-wrap:wrap}
+@keyframes blin{from{opacity:0;transform:translateY(-5px)}to{opacity:1;transform:translateY(0)}}
+.bulk-cnt{font-size:12px;font-weight:700;color:var(--acl);flex-shrink:0}
+.bulk-sep{width:1px;height:16px;background:var(--b2);flex-shrink:0}
+/* checkbox reset */
+input[type=checkbox].cb{width:15px;height:15px;accent-color:var(--acc);cursor:pointer;flex-shrink:0}
+/* extra filter row */
+.filter-row{display:flex;gap:8px;align-items:center;padding:10px 20px;border-bottom:1px solid var(--b1);flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -545,45 +554,134 @@ async function renderEvents(){
   document.getElementById('pageSub').textContent=`共 ${EVENTS.length} 条`;
   renderEvtTable();
 }
+let _evtQ='',_evtRound='',_evtStatus='',_evtDate='';
 function renderEvtTable(){
+  // Build date list
+  const dateSet=new Set();
+  EVENTS.forEach(e=>{const d=new Date(e.start_time);dateSet.add(`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`)});
+  const dates=[...dateSet].sort();
   document.getElementById('content').innerHTML=`
     <div class="section">
       <div class="sec-head">
         <span class="sec-title">赛事列表</span>
-        <span class="sec-cnt">${EVENTS.length}</span>
+        <span class="sec-cnt" id="evtCnt">${EVENTS.length}</span>
         <div class="sec-actions">
-          <input type="text" id="evtSearch" placeholder="搜索赛事名称…" oninput="filterEvts(this.value)"
-            style="padding:5px 10px;background:var(--gl);border:1px solid var(--b1);border-radius:6px;color:var(--t1);font-size:12px;font-family:var(--sans);outline:none;width:180px">
+          <input class="search-input" id="evtQ" placeholder="搜索名称 / 赛次…" value="${_evtQ.replace(/"/g,'&quot;')}" oninput="_evtQ=this.value;applyEvtFilter()" style="width:180px">
         </div>
+      </div>
+      <div class="filter-row">
+        <select class="search-select" id="evtFRound" onchange="_evtRound=this.value;applyEvtFilter()">
+          <option value="">全部赛次</option>
+          <option ${_evtRound==='预赛'?'selected':''}>预赛</option>
+          <option ${_evtRound==='小组赛'?'selected':''}>小组赛</option>
+          <option ${_evtRound==='半决赛'?'selected':''}>半决赛</option>
+          <option ${_evtRound==='决赛'?'selected':''}>决赛</option>
+          <option ${_evtRound==='其他'?'selected':''}>其他</option>
+        </select>
+        <select class="search-select" id="evtFStatus" onchange="_evtStatus=this.value;applyEvtFilter()">
+          <option value="">全部状态</option>
+          <option value="scheduled" ${_evtStatus==='scheduled'?'selected':''}>计划中</option>
+          <option value="live" ${_evtStatus==='live'?'selected':''}>直播中</option>
+          <option value="finished" ${_evtStatus==='finished'?'selected':''}>已完成</option>
+          <option value="cancelled" ${_evtStatus==='cancelled'?'selected':''}>已取消</option>
+        </select>
+        <select class="search-select" id="evtFDate" onchange="_evtDate=this.value;applyEvtFilter()">
+          <option value="">全部日期</option>
+          ${dates.map(d=>{const dt=new Date(d+'T00:00:00');return `<option value="${d}" ${_evtDate===d?'selected':''}>${dt.getMonth()+1}月${dt.getDate()}日</option>`;}).join('')}
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="_evtQ='';_evtRound='';_evtStatus='';_evtDate='';renderEvtTable()">清除筛选</button>
+        <span style="margin-left:auto;font-size:11px;color:var(--t3)" id="evtFilterNote"></span>
+      </div>
+      <div id="eBulk" class="bulk-bar" style="display:none">
+        <span class="bulk-cnt" id="eBulkCnt">已选 0 条</span>
+        <div class="bulk-sep"></div>
+        <button class="btn btn-danger btn-sm" onclick="bulkDelEvts()">🗑 批量删除</button>
+        <select class="search-select" id="eBulkStatus" style="padding:4px 8px;font-size:11px">
+          <option value="">改为状态…</option>
+          <option value="scheduled">计划中</option>
+          <option value="live">直播中</option>
+          <option value="finished">已完成</option>
+          <option value="cancelled">已取消</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="bulkStatusEvts()">✓ 应用状态</button>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="evtSelAll(false)">取消选择</button>
       </div>
       <div class="table-wrap">
         <table id="evtTbl">
-          <tr><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th><th>金牌</th><th>频道</th><th>操作</th></tr>
+          <tr>
+            <th style="width:32px"><input type="checkbox" class="cb" id="eSelAll" onclick="evtSelAll(this.checked)"></th>
+            <th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th><th>金牌</th><th>操作</th>
+          </tr>
           ${evtRows(EVENTS)}
         </table>
       </div>
     </div>`;
 }
+function applyEvtFilter(){
+  const q=_evtQ.toLowerCase();
+  const filt=EVENTS.filter(e=>{
+    if(q&&!(e.name||'').toLowerCase().includes(q)&&!(e.round||'').toLowerCase().includes(q)) return false;
+    if(_evtRound&&e.round!==_evtRound) return false;
+    if(_evtStatus&&e.status!==_evtStatus) return false;
+    if(_evtDate){const d=new Date(e.start_time);if(`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`!==_evtDate)return false;}
+    return true;
+  });
+  const hdr=`<tr><th style="width:32px"><input type="checkbox" class="cb" id="eSelAll" onclick="evtSelAll(this.checked)"></th><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th><th>金牌</th><th>操作</th></tr>`;
+  document.getElementById('evtTbl').innerHTML=hdr+evtRows(filt);
+  document.getElementById('evtCnt').textContent=filt.length===EVENTS.length?`${EVENTS.length}`:`${filt.length} / ${EVENTS.length}`;
+  document.getElementById('evtFilterNote').textContent=filt.length!==EVENTS.length?`已筛选，共 ${filt.length} 条`:'';
+  document.getElementById('eBulk').style.display='none';
+}
 function evtRows(evts){
   if(!evts.length) return '<tr><td colspan="9" style="text-align:center;color:var(--t3);padding:30px">暂无数据</td></tr>';
   return evts.map(e=>`<tr>
-    <td style="color:var(--t1);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${e.name}</td>
+    <td><input type="checkbox" class="cb esb" value="${e.id}" onchange="evtChkChange()"></td>
+    <td style="color:var(--t1);font-weight:500;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${e.name}">${e.is_medal_event?'🥇 ':''}${e.name}</td>
     <td>${VENUES.find(v=>v.id===e.venue_id)?.short_name||'—'}</td>
-    <td><span class="badge">${e.round}</span></td>
+    <td><span class="badge">${e.round||'—'}</span></td>
     <td class="mono" style="font-size:10px">${fmtDT(e.start_time)}</td>
     <td class="mono" style="font-size:10px">${fmtDT(e.end_time)}</td>
     <td>${statusBadge(e.status)}</td>
     <td style="text-align:center">${e.is_medal_event?'🥇':''}</td>
-    <td style="color:var(--t3);font-size:11px">${e.broadcast_channel||'—'}</td>
     <td><div style="display:flex;gap:4px">
-      <button class="btn btn-ghost btn-sm" onclick='openEvtModal(${JSON.stringify(e).replace(/'/g,"&#39;")})'>编辑</button>
-      <button class="btn btn-danger btn-sm" onclick="delEvent('${e.id}')">删除</button>
+      <button class="btn btn-ghost btn-sm" onclick='openEvtModal(${JSON.stringify(e).replace(/'/g,"&#39;")})'>✎</button>
+      <button class="btn btn-danger btn-sm" onclick="delEvent('${e.id}')">✕</button>
     </div></td>
   </tr>`).join('');
 }
-function filterEvts(q){
-  const filtered=EVENTS.filter(e=>e.name.includes(q)||e.round.includes(q));
-  document.querySelector('#evtTbl').innerHTML=`<tr><th>赛事名称</th><th>场馆</th><th>赛次</th><th>开始</th><th>结束</th><th>状态</th><th>金牌</th><th>频道</th><th>操作</th></tr>${evtRows(filtered)}`;
+function filterEvts(q){_evtQ=q;applyEvtFilter();}
+function evtSelAll(checked){
+  document.querySelectorAll('.esb').forEach(c=>c.checked=checked);
+  if(!checked){const sa=document.getElementById('eSelAll');if(sa)sa.indeterminate=false;}
+  evtChkChange();
+}
+function evtChkChange(){
+  const sel=[...document.querySelectorAll('.esb:checked')];
+  const all=document.querySelectorAll('.esb');
+  const bulk=document.getElementById('eBulk');
+  if(bulk) bulk.style.display=sel.length?'flex':'none';
+  const cnt=document.getElementById('eBulkCnt');
+  if(cnt) cnt.textContent=`已选 ${sel.length} 条`;
+  const sa=document.getElementById('eSelAll');
+  if(sa){sa.checked=sel.length===all.length&&all.length>0;sa.indeterminate=sel.length>0&&sel.length<all.length;}
+}
+async function bulkDelEvts(){
+  const ids=[...document.querySelectorAll('.esb:checked')].map(c=>c.value);
+  if(!ids.length)return;
+  if(!confirm(`确定永久删除选中的 ${ids.length} 条赛程？此操作不可恢复。`))return;
+  const {error}=await db.from('events').delete().in('id',ids);
+  if(error){alert('删除失败: '+error.message);return;}
+  await logAction('delete','events',`批量删除 ${ids.length} 条赛程`);
+  await renderEvents();
+}
+async function bulkStatusEvts(){
+  const ids=[...document.querySelectorAll('.esb:checked')].map(c=>c.value);
+  const ns=document.getElementById('eBulkStatus')?.value;
+  if(!ids.length||!ns){alert('请先选择目标状态');return;}
+  const {error}=await db.from('events').update({status:ns}).in('id',ids);
+  if(error){alert('更新失败: '+error.message);return;}
+  await logAction('update','events',`批量改状态→${ns}，共 ${ids.length} 条`);
+  await renderEvents();
 }
 
 /* ── EVENT MODAL ── */
@@ -654,28 +752,94 @@ async function delEvent(id){
 }
 
 /* ── VENUES ── */
+let _venueQ='';
 async function renderVenues(){
-  document.getElementById('pageActions').innerHTML='';
+  document.getElementById('pageActions').innerHTML=`<button class="btn btn-primary" onclick="openVenueModal(null)">＋ 添加场馆</button>`;
   document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
   const {data}=await db.from('venues').select('*').order('name');
   VENUES=data||[];
+  _venueQ='';
   document.getElementById('pageSub').textContent=`共 ${VENUES.length} 个场馆`;
+  renderVenueTable();
+}
+function renderVenueTable(){
+  const q=_venueQ.toLowerCase();
+  const filt=VENUES.filter(v=>!q||(v.name||'').toLowerCase().includes(q)||(v.short_name||'').toLowerCase().includes(q)||(v.sport||'').toLowerCase().includes(q));
   document.getElementById('content').innerHTML=`
     <div class="section">
-      <div class="sec-head"><span class="sec-title">场馆列表</span><span class="sec-cnt">${VENUES.length}</span></div>
-      <div class="table-wrap"><table>
-        <tr><th>场馆</th><th>简称</th><th>运动项目</th><th>位置</th><th>颜色</th><th>状态</th><th>操作</th></tr>
-        ${VENUES.map(v=>`<tr>
+      <div class="sec-head">
+        <span class="sec-title">场馆列表</span>
+        <span class="sec-cnt" id="venueCnt">${filt.length} / ${VENUES.length}</span>
+        <div class="sec-actions">
+          <input class="search-input" id="venueQ" placeholder="搜索场馆名称 / 项目…" value="${_venueQ.replace(/"/g,'&quot;')}" oninput="_venueQ=this.value;renderVenueTable()" style="width:200px">
+        </div>
+      </div>
+      <div id="vBulk" class="bulk-bar" style="display:none">
+        <span class="bulk-cnt" id="vBulkCnt">已选 0 个</span>
+        <div class="bulk-sep"></div>
+        <button class="btn btn-danger btn-sm" onclick="bulkDelVenues()">🗑 批量删除</button>
+        <button class="btn btn-ghost btn-sm" onclick="bulkToggleVenues(true)">✓ 批量启用</button>
+        <button class="btn btn-ghost btn-sm" onclick="bulkToggleVenues(false)">✗ 批量停用</button>
+        <button class="btn btn-ghost btn-sm" style="margin-left:auto" onclick="venueSelAll(false)">取消选择</button>
+      </div>
+      <div class="table-wrap"><table id="venueTbl">
+        <tr>
+          <th style="width:32px"><input type="checkbox" class="cb" id="vSelAll" onclick="venueSelAll(this.checked)"></th>
+          <th>场馆名称</th><th>简称</th><th>运动项目</th><th>位置</th><th>颜色</th><th>状态</th><th>操作</th>
+        </tr>
+        ${filt.map(v=>`<tr id="vr-${v.id}">
+          <td><input type="checkbox" class="cb vsb" value="${v.id}" onchange="venueChkChange()"></td>
           <td style="color:var(--t1);font-weight:500">${v.name}</td>
           <td>${v.short_name||'—'}</td>
           <td>${v.sport||'—'}</td>
           <td>${v.location||'—'}</td>
-          <td><div style="display:flex;align-items:center;gap:6px"><div style="width:16px;height:16px;border-radius:4px;background:${v.color}"></div>${v.color}</div></td>
+          <td><div style="display:flex;align-items:center;gap:6px"><div style="width:14px;height:14px;border-radius:3px;background:${v.color||'#888'}"></div><span style="font-size:11px;color:var(--t3)">${v.color||'—'}</span></div></td>
           <td><span class="badge ${v.is_active?'sched':'done'}">${v.is_active?'启用':'停用'}</span></td>
-          <td><button class="btn btn-ghost btn-sm" onclick='openVenueModal(${JSON.stringify(v).replace(/'/g,"&#39;")})'>编辑</button></td>
+          <td><div style="display:flex;gap:4px">
+            <button class="btn btn-ghost btn-sm" onclick='openVenueModal(${JSON.stringify(v).replace(/'/g,"&#39;")})'>✎ 编辑</button>
+            <button class="btn btn-danger btn-sm" onclick="delVenue('${v.id}','${v.name.replace(/'/g,'')}')">✕</button>
+          </div></td>
         </tr>`).join('')}
       </table></div>
     </div>`;
+}
+function venueSelAll(checked){
+  document.querySelectorAll('.vsb').forEach(c=>c.checked=checked);
+  if(!checked) document.getElementById('vSelAll').indeterminate=false;
+  venueChkChange();
+}
+function venueChkChange(){
+  const sel=[...document.querySelectorAll('.vsb:checked')];
+  const all=document.querySelectorAll('.vsb');
+  document.getElementById('vBulk').style.display=sel.length?'flex':'none';
+  document.getElementById('vBulkCnt').textContent=`已选 ${sel.length} 个场馆`;
+  const sa=document.getElementById('vSelAll');
+  sa.checked=sel.length===all.length&&all.length>0;
+  sa.indeterminate=sel.length>0&&sel.length<all.length;
+}
+async function bulkDelVenues(){
+  const ids=[...document.querySelectorAll('.vsb:checked')].map(c=>c.value);
+  if(!ids.length)return;
+  if(!confirm(`确定永久删除选中的 ${ids.length} 个场馆？所有关联赛程将失去场馆信息。`))return;
+  const {error}=await db.from('venues').delete().in('id',ids);
+  if(error){alert('删除失败: '+error.message);return;}
+  await logAction('delete','venues',`批量删除 ${ids.length} 个场馆`);
+  VENUES=[];await renderVenues();
+}
+async function bulkToggleVenues(active){
+  const ids=[...document.querySelectorAll('.vsb:checked')].map(c=>c.value);
+  if(!ids.length)return;
+  const {error}=await db.from('venues').update({is_active:active}).in('id',ids);
+  if(error){alert('操作失败: '+error.message);return;}
+  await logAction('update','venues',`批量${active?'启用':'停用'} ${ids.length} 个场馆`);
+  VENUES=[];await renderVenues();
+}
+async function delVenue(id,name){
+  if(!confirm(`确定删除场馆"${name}"？`))return;
+  const {error}=await db.from('venues').delete().eq('id',id);
+  if(error){alert('删除失败: '+error.message);return;}
+  await logAction('delete','venues',name);
+  VENUES=[];await renderVenues();
 }
 function openVenueModal(v){
   document.getElementById('venueModalTitle').textContent=v?'编辑场馆':'添加场馆';
