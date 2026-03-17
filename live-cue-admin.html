@@ -2226,7 +2226,7 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
   const dateKeys=Object.keys(groups).sort();
   if(!dateKeys.length){alert('没有可导出的数据');return;}
   const DAYS='日一二三四五六';
-  const seqW=36,venueW=100,sportW=160,stdW=46;
+  const seqW=36,venueW=isT?120:100,sportW=isT?0:160,stdW=46;
   const pxPerHr=72,rowH=isT?46:38;
   const TEAM_KW=['水球','三人篮球','沙滩足球','沙滩手球','沙滩卡巴迪','龙舟','沙滩排球'];
   const pagesHtml=dateKeys.map((date,pageIdx)=>{
@@ -2396,7 +2396,7 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
         rowsHtml+=`<tr style="min-height:${dynH}px;background:${bg}">
           <td style="width:${seqW}px;text-align:center;font-size:9.5px;font-weight:600;color:#64748b;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${seqNum}</td>
           <td style="width:${venueW}px;padding:3px 8px;vertical-align:middle;border-left:3px solid ${venue.color};border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${vContent}</td>
-          <td style="width:${sportW}px;padding:3px 8px;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${spContent}</td>
+          ${isT?'':String.raw`<td style="width:${sportW}px;padding:3px 8px;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${spContent}</td>`}
           <td style="width:${stdW}px;text-align:center;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${stdContent}</td>
           <td style="position:relative;overflow:hidden;border-bottom:1px solid #dde3ea;height:${dynH}px;min-height:${dynH}px">${gTicks}${blocks}</td>
         </tr>`;
@@ -2426,12 +2426,12 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
 </header>
 <div style="overflow-x:auto">
 <table style="width:${tableW}px;border-collapse:collapse;table-layout:fixed;border:1.5px solid #94a3b8">
-<colgroup><col style="width:${seqW}px"><col style="width:${venueW}px"><col style="width:${sportW}px"><col style="width:${stdW}px"><col></colgroup>
+<colgroup><col style="width:${seqW}px"><col style="width:${venueW}px">${isT?'':`<col style="width:${sportW}px">`}<col style="width:${stdW}px"><col></colgroup>
 <thead>
 <tr style="background:#1e3a5f;height:30px">
   <th style="text-align:center;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">序号</th>
   <th style="text-align:left;padding-left:9px;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">场馆名称</th>
-  <th style="text-align:left;padding-left:9px;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">${isT?'分项 / 赛次':'赛事 / 赛次'}</th>
+  ${isT?'':String.raw`<th style="text-align:left;padding-left:9px;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">赛事 / 赛次</th>`}
   <th style="text-align:center;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">${isT?'制式':'备注'}</th>
   <th style="position:relative;overflow:hidden;padding:0">${hTicks}</th>
 </tr>
