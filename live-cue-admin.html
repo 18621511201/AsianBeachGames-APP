@@ -1520,17 +1520,36 @@ ${rawText.slice(0,12000)}
         'anthropic-dangerous-direct-browser-access':'true'
       },
       body:JSON.stringify({
-        model:'claude-opus-4-5',
+        model:'claude-3-5-sonnet-20241022',
         max_tokens:4096,
         messages:[{role:'user',content:prompt}]
       })
     });
     if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||`API错误 ${resp.status}`);}
     const data=await resp.json();
-    const txt=data.content[0].text.trim();
-    const jsonMatch=txt.match(/\[[\s\S]*\]/);
-    if(!jsonMatch) throw new Error('AI 返回内容无法解析为 JSON');
-    _aiParsedEvents=JSON.parse(jsonMatch[0]);
+    let txt=data.content[0].text.trim();
+    // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
+    txt=txt.replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/,'').trim();
+    // Try to find a JSON array directly
+    let jsonMatch=txt.match(/\[[\s\S]*\]/);
+    // If not found, try JSON object wrapper e.g. {"events":[...]}
+    if(!jsonMatch){
+      const objMatch=txt.match(/\{[\s\S]*\}/);
+      if(objMatch){
+        try{
+          const obj=JSON.parse(objMatch[0]);
+          // Find first array value in the object
+          const arr=Object.values(obj).find(v=>Array.isArray(v));
+          if(arr){_aiParsedEvents=arr;}
+          else throw new Error('对象中未找到数组');
+        }catch(pe){throw new Error('AI 返回内容无法解析为 JSON：'+pe.message);}
+      } else {
+        // Last resort: show first 200 chars of response for debugging
+        throw new Error('AI 返回内容无法解析为 JSON，原始内容：'+txt.slice(0,200));
+      }
+    } else {
+      _aiParsedEvents=JSON.parse(jsonMatch[0]);
+    }
     document.getElementById('fileStatus').innerHTML=`<span style="color:var(--ok)">✓ AI 解析完成，发现 ${_aiParsedEvents.length} 条赛事</span>`;
     renderAiResult(_aiParsedEvents, fileName);
     await logAction('import','events',`AI解析文件 [${fileName}] 发现 ${_aiParsedEvents.length} 条赛事`);
