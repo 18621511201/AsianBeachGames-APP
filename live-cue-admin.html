@@ -1646,37 +1646,44 @@ async function renderAiResult(parsedEvents, fileName){
   const fmtT=ts=>ts?new Date(ts).toLocaleString('zh-CN',{month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'?';
 
   // Categorise each parsed event
-  const newEvts=[],modEvts=[],dupEvts=[],badEvts=[];
+  const newEvts=[],modEvts=[],dupEvts=[],skipEvts=[],badEvts=[];
   parsedEvents.forEach(pe=>{
     if(!pe.venue_id){badEvts.push({...pe,_reason:'未匹配场馆'});return;}
     const st=pe.start_time?new Date(pe.start_time).getTime():null;
     const et=pe.end_time?new Date(pe.end_time).getTime():null;
-    // Find a matching DB event: same name + venue + round (fuzzy time ±60min)
-    const match=dbAll.find(de=>
-      (de.name||'').trim()===(pe.name||'').trim() &&
+    const peName=(pe.name||'').trim();
+    const peRound=(pe.round||'').trim();
+
+    // CLEAR match: exact name + same venue + same round → find all candidates
+    const candidates=dbAll.filter(de=>
+      (de.name||'').trim()===peName &&
       de.venue_id===pe.venue_id &&
-      de.round===pe.round &&
-      st && Math.abs((de.start_time||0)-st)<3600000
+      (de.round||'').trim()===peRound
     );
-    if(!match){
+
+    if(candidates.length===0){
+      // No exact match at all → new event
       newEvts.push({...pe,_st:st,_et:et});
-    } else {
-      // Check if anything changed
+    } else if(candidates.length===1){
+      // Exactly ONE match → clear, check for changes
+      const match=candidates[0];
       const changed=[];
       if(st&&Math.abs((match.start_time||0)-st)>60000) changed.push({f:'开始时间',old:fmtT(match.start_time),nw:fmtT(st)});
       if(et&&Math.abs((match.end_time||0)-et)>60000) changed.push({f:'结束时间',old:fmtT(match.end_time),nw:fmtT(et)});
-      if(pe.round&&match.round!==pe.round) changed.push({f:'赛次',old:match.round,nw:pe.round});
       if(typeof pe.is_medal_event==='boolean'&&match.is_medal_event!==pe.is_medal_event) changed.push({f:'金牌',old:match.is_medal_event?'是':'否',nw:pe.is_medal_event?'是':'否'});
       if(changed.length) modEvts.push({...pe,_st:st,_et:et,_dbId:match.id,_changes:changed});
       else dupEvts.push({...pe,_dbId:match.id});
+    } else {
+      // Multiple matches → ambiguous, skip (don't modify)
+      skipEvts.push({...pe,_st:st,_et:et,_reason:`识别不明确（找到 ${candidates.length} 条同名记录）`});
     }
   });
-  _diffResult={newEvts,modEvts,dupEvts,badEvts};
+  _diffResult={newEvts,modEvts,dupEvts,skipEvts,badEvts};
 
   // Build the diff UI
   const sec=document.getElementById('aiResultSection');
   sec.style.display='';
-  document.getElementById('aiResultCnt').textContent=`${parsedEvents.length} 条 · 🆕${newEvts.length} ✏️${modEvts.length} ✓${dupEvts.length} ⚠️${badEvts.length}`;
+  document.getElementById('aiResultCnt').textContent=`${parsedEvents.length} 条 · 🆕${newEvts.length} ✏️${modEvts.length} ✓${dupEvts.length} ⏭${skipEvts.length} ⚠️${badEvts.length}`;
 
   function diffTable(rows,type){
     if(!rows.length) return `<div style="padding:16px 20px;color:var(--t3);font-size:12px">无</div>`;
@@ -1710,15 +1717,17 @@ async function renderAiResult(parsedEvents, fileName){
   document.getElementById('aiResultBody').innerHTML=`
     <div style="padding:14px 20px;background:rgba(16,185,129,.06);border-bottom:1px solid var(--b1);display:flex;gap:20px;flex-wrap:wrap;align-items:center">
       <span style="font-size:12px;color:#10b981;font-weight:700">🆕 新增 ${newEvts.length} 条</span>
-      <span style="font-size:12px;color:#f59e0b;font-weight:700">✏️ 修改 ${modEvts.length} 条</span>
-      <span style="font-size:12px;color:var(--t3)">✓ 重复 ${dupEvts.length} 条（跳过）</span>
-      ${badEvts.length?`<span style="font-size:12px;color:#ef4444;font-weight:700">⚠️ 无法匹配 ${badEvts.length} 条</span>`:''}
+      <span style="font-size:12px;color:#f59e0b;font-weight:700">✏️ 变更 ${modEvts.length} 条</span>
+      <span style="font-size:12px;color:var(--t3)">✓ 重复 ${dupEvts.length} 条</span>
+      ${skipEvts.length?`<span style="font-size:12px;color:#94a3b8">⏭ 不明确 ${skipEvts.length} 条（不修改）</span>`:''}
+      ${badEvts.length?`<span style="font-size:12px;color:#ef4444;font-weight:700">⚠️ 未匹配 ${badEvts.length} 条</span>`:''}
       <button class="btn btn-primary" style="margin-left:auto" onclick="confirmAiImport()">✓ 确认写入数据库</button>
       <button class="btn btn-ghost" onclick="document.getElementById('aiResultSection').style.display='none';_diffResult=null">取消</button>
     </div>
     ${newEvts.length?`<div style="padding:10px 20px 4px"><span style="font-size:11px;font-weight:700;color:#10b981">🆕 新增（将插入）</span></div>${diffTable(newEvts,'new')}`:''}
-    ${modEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#f59e0b">✏️ 变更（将更新）</span></div>${diffTable(modEvts,'mod')}`:''}
-    ${dupEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:var(--t3)">✓ 重复（自动跳过）</span></div>${diffTable(dupEvts,'dup')}`:''}
+    ${modEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#f59e0b">✏️ 变更（将更新，明确匹配）</span></div>${diffTable(modEvts,'mod')}`:''}
+    ${dupEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:var(--t3)">✓ 重复（内容相同，跳过）</span></div>${diffTable(dupEvts,'dup')}`:''}
+    ${skipEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#94a3b8">⏭ 识别不明确（已跳过，不做修改）</span><span style="font-size:10px;color:var(--t3);margin-left:8px">找到多条同名记录无法确认对应哪一条</span></div>${diffTable(skipEvts,'bad')}`:''}
     ${badEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#ef4444">⚠️ 无法导入（场馆未匹配）</span></div>${diffTable(badEvts,'bad')}`:''}`;
 }
 
