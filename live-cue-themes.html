@@ -821,39 +821,53 @@ function parseVenueLocJson(loc){
 }
 
 // Returns [{label:'', evts:[]}]
-// Priority: ① venue-defined courts (admin管理的子场地) → ② event-tagged courts → ③ auto collision detect
+// Priority: ① venue-defined courts → ② event-tagged courts → ③ auto collision detect
 function getVenueLanes(venueId){
   const venue=VENUES.find(v=>v.id===venueId);
   const {courts:definedCourts}=parseVenueLocJson(venue?.location||'');
-  const activeCourts=definedCourts.filter(c=>c.on!==false);
-  const inactiveCourts=definedCourts.filter(c=>c.on===false);
-  const inactiveNames=new Set(inactiveCourts.map(c=>c.n));
   const evts=allEvts.filter(e=>e.venue_id===venueId);
   if(!evts.length) return [{label:'',evts:[]}];
 
-  // ① Venue has defined sub-courts — only show events explicitly tagged to active courts
+  // ① Venue has defined sub-courts
   if(definedCourts.length>0){
-    if(activeCourts.length===0) return []; // all courts off → hide venue
-    const lanes=activeCourts.map(c=>({
-      label:c.n,
-      evts:evts.filter(e=>parseCourt(e.notes)===c.n)
-    }));
-    return lanes.filter(ln=>ln.evts.length>0);
+    if(definedCourts.every(c=>c.on===false)) return []; // all courts off → hide venue
+    const inactiveNames=new Set(definedCourts.filter(c=>c.on===false).map(c=>c.n));
+
+    // 1a. Events with explicit court tags — respect tag + on/off
+    const hasTagged=evts.some(e=>parseCourt(e.notes)&&definedCourts.some(c=>c.n===parseCourt(e.notes)));
+    if(hasTagged){
+      const activeCourts=definedCourts.filter(c=>c.on!==false);
+      const lanes=activeCourts.map(c=>({label:c.n,evts:evts.filter(e=>parseCourt(e.notes)===c.n)}));
+      // Untagged events (no court tag at all) show in first active lane
+      const untagged=evts.filter(e=>!parseCourt(e.notes));
+      if(untagged.length&&lanes.length>0) lanes[0].evts.push(...untagged);
+      return lanes.filter(ln=>ln.evts.length>0);
+    }
+
+    // 1b. No explicit tags — auto-detect rows, map row index to defined court by order
+    const sorted=evts.slice().sort((a,b)=>a.start_time-b.start_time);
+    const rows=[];
+    sorted.forEach(ev=>{
+      let placed=false;
+      for(let i=0;i<rows.length;i++){
+        if(!rows[i].some(le=>ev.start_time<le.end_time&&ev.end_time>le.start_time)){rows[i].push(ev);placed=true;break;}
+      }
+      if(!placed) rows.push([ev]);
+    });
+    // Map row → defined court (by index); rows beyond defined courts always show
+    return rows
+      .map((rowEvts,i)=>({def:definedCourts[i],evts:rowEvts}))
+      .filter(({def})=>!def||def.on!==false)
+      .map(({def,evts},i)=>({label:def?def.n:(rows.length>1?`场地 ${i+1}`):'',evts}))
+      .filter(ln=>ln.evts.length>0);
   }
 
-  // ② Events have explicit court tags in notes
+  // ② Events have explicit court tags in notes (no admin-defined courts)
   const hasExplicit=evts.some(e=>parseCourt(e.notes));
   if(hasExplicit){
     const map={};
-    evts.forEach(e=>{
-      const k=parseCourt(e.notes)||'__none__';
-      if(!map[k]) map[k]=[];
-      map[k].push(e);
-    });
-    const keys=Object.keys(map).sort((a,b)=>{
-      if(a==='__none__') return 1; if(b==='__none__') return -1;
-      return a.localeCompare(b,'zh');
-    });
+    evts.forEach(e=>{const k=parseCourt(e.notes)||'__none__';if(!map[k])map[k]=[];map[k].push(e);});
+    const keys=Object.keys(map).sort((a,b)=>{if(a==='__none__')return 1;if(b==='__none__')return -1;return a.localeCompare(b,'zh');});
     return keys.map(k=>({label:k==='__none__'?'':k,evts:map[k]}));
   }
 
@@ -863,8 +877,7 @@ function getVenueLanes(venueId){
   sorted.forEach(ev=>{
     let placed=false;
     for(let i=0;i<lanes.length;i++){
-      const overlaps=lanes[i].evts.some(le=>ev.start_time<le.end_time&&ev.end_time>le.start_time);
-      if(!overlaps){lanes[i].evts.push(ev);placed=true;break;}
+      if(!lanes[i].evts.some(le=>ev.start_time<le.end_time&&ev.end_time>le.start_time)){lanes[i].evts.push(ev);placed=true;break;}
     }
     if(!placed) lanes.push({label:'',evts:[ev]});
   });

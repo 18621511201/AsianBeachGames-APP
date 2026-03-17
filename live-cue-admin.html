@@ -2267,12 +2267,34 @@ function setOrient(o){
 function adminGetLanes(venue, vEvts){
   if(!vEvts.length) return [];
   const {courts:defined}=parseVenueLocJson(venue.location||'');
-  const active=defined.filter(c=>c.on!==false);
-  // ① Venue has defined sub-courts — only show events tagged to active courts
+  // ① Venue has defined sub-courts
   if(defined.length>0){
-    if(active.length===0) return []; // all courts off → hide venue entirely
-    const lanes=active.map(c=>({label:c.n,evts:vEvts.filter(e=>parseCourtNotes(e.notes).court===c.n)}));
-    return lanes.filter(ln=>ln.evts.length>0);
+    if(defined.every(c=>c.on===false)) return []; // all off → hide
+    const inactiveNames=new Set(defined.filter(c=>c.on===false).map(c=>c.n));
+    // 1a. Explicit court tags exist
+    const hasTagged=vEvts.some(e=>parseCourtNotes(e.notes).court&&defined.some(c=>c.n===parseCourtNotes(e.notes).court));
+    if(hasTagged){
+      const active=defined.filter(c=>c.on!==false);
+      const lanes=active.map(c=>({label:c.n,evts:vEvts.filter(e=>parseCourtNotes(e.notes).court===c.n)}));
+      const untagged=vEvts.filter(e=>!parseCourtNotes(e.notes).court);
+      if(untagged.length&&lanes.length>0) lanes[0].evts.push(...untagged);
+      return lanes.filter(ln=>ln.evts.length>0);
+    }
+    // 1b. No tags → auto-detect rows, map by index to defined courts
+    const sorted=vEvts.slice().sort((a,b)=>a.start_time-b.start_time);
+    const rows=[];
+    sorted.forEach(ev=>{
+      let placed=false;
+      for(let i=0;i<rows.length;i++){
+        if(!rows[i].some(le=>ev.start_time<le.end_time&&ev.end_time>le.start_time)){rows[i].push(ev);placed=true;break;}
+      }
+      if(!placed) rows.push([ev]);
+    });
+    return rows
+      .map((rowEvts,i)=>({def:defined[i],evts:rowEvts}))
+      .filter(({def})=>!def||def.on!==false)
+      .map(({def,evts},i)=>({label:def?def.n:(rows.length>1?`场地${i+1}`:''),evts}))
+      .filter(ln=>ln.evts.length>0);
   }
   // ② No courts defined → auto collision detect
   const sorted=vEvts.slice().sort((a,b)=>a.start_time-b.start_time);
