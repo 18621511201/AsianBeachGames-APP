@@ -126,7 +126,66 @@ tr:hover td{background:var(--gl)}
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar{width:4px;height:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b2);border-radius:2px}
 /* ── RESPONSIVE ── */
-@media(max-width:768px){.sidebar{display:none}.stat-grid{grid-template-columns:1fr 1fr}.field-row{grid-template-columns:1fr}}
+.mob-menu-btn{display:none;align-items:center;justify-content:center;width:36px;height:36px;border-radius:7px;background:var(--gl);border:1px solid var(--b1);cursor:pointer;flex-shrink:0;color:var(--t2);margin-right:4px}
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:299;backdrop-filter:blur(2px)}
+/* mobile bottom nav */
+.mob-nav{display:none;position:fixed;bottom:0;left:0;right:0;height:56px;background:var(--surf);border-top:1px solid var(--b1);z-index:200;align-items:stretch}
+.mob-nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;cursor:pointer;color:var(--t3);font-size:9px;font-weight:600;letter-spacing:.04em;padding:6px 2px;transition:color .15s;border:none;background:none;font-family:var(--sans)}
+.mob-nav-item.active{color:var(--acl)}
+.mob-nav-item svg{flex-shrink:0}
+@media(max-width:768px){
+  /* Sidebar becomes slide-in drawer */
+  .sidebar{position:fixed;left:-240px;top:0;bottom:0;z-index:300;transition:left .25s cubic-bezier(.4,0,.2,1);width:240px;box-shadow:4px 0 24px rgba(0,0,0,.6);display:flex}
+  .sidebar.mob-open{left:0}
+  .mob-overlay.mob-open{display:block}
+  .mob-menu-btn{display:flex}
+  /* Topbar */
+  .topbar{padding:0 12px;gap:8px;height:48px}
+  .topbar-sub{display:none}
+  .topbar-title{font-size:13px}
+  /* Content — add bottom padding for nav bar */
+  .content{padding:12px 12px 70px;scrollbar-width:none}
+  /* Stat cards */
+  .stat-grid{grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px}
+  .sc-num{font-size:22px}
+  /* Forms */
+  .field-row{grid-template-columns:1fr}
+  /* Section headers */
+  .sec-head{flex-wrap:wrap;gap:8px;padding:10px 14px}
+  .sec-actions{width:100%;justify-content:flex-end}
+  /* Table */
+  th,td{padding:8px 10px}
+  table{font-size:11px}
+  /* Schedule view — stack panels */
+  .sched-layout{flex-direction:column}
+  .sched-left{width:100%;position:static;max-height:none;margin-bottom:12px}
+  /* Sections */
+  .section{border-radius:8px}
+  /* Search bar */
+  .search-bar{padding:10px 12px;gap:6px}
+  .search-input{min-width:120px;font-size:12px}
+  /* Filter row */
+  .filter-row{padding:8px 12px;gap:6px}
+  /* Modal */
+  .modal{padding:18px;border-radius:12px}
+  /* Buttons touch targets */
+  .btn{padding:8px 14px}
+  .btn-sm{padding:6px 10px}
+  /* Log rows */
+  .log-row{padding:8px 12px;gap:8px}
+  /* Drop zone */
+  .drop-zone{padding:24px 16px}
+  /* Bottom nav */
+  .mob-nav{display:flex}
+  /* Show login box full width */
+  .login-box{width:calc(100vw - 32px);padding:24px}
+}
+@media(max-width:420px){
+  .stat-grid{grid-template-columns:1fr 1fr;gap:6px}
+  .content{padding:8px 8px 70px}
+  .sec-head{padding:8px 12px}
+  th,td{padding:6px 8px;font-size:10px}
+}
 /* ── SCHEDULE VIEW ── */
 .sched-layout{display:flex;gap:16px;align-items:flex-start}
 .sched-left{width:234px;flex-shrink:0;background:var(--surf);border:1px solid var(--b1);border-radius:var(--r);padding:8px;position:sticky;top:0;max-height:calc(100vh - 110px);overflow-y:auto}
@@ -265,9 +324,15 @@ input[type=checkbox].cb{width:15px;height:15px;accent-color:var(--acc);cursor:po
     </div>
   </div>
 
+  <!-- Mobile overlay -->
+  <div class="mob-overlay" id="mobOverlay" onclick="closeMobMenu()"></div>
+
   <!-- MAIN -->
   <div class="main">
     <div class="topbar">
+      <button class="mob-menu-btn" onclick="toggleMobMenu()" aria-label="菜单">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
       <span class="topbar-title" id="pageTitle">仪表盘</span>
       <span class="topbar-sub" id="pageSub"></span>
       <div class="topbar-right" id="pageActions"></div>
@@ -460,8 +525,27 @@ function showApp(){
 document.getElementById('loginPwd').addEventListener('keydown',e=>{if(e.key==='Enter')doLogin();});
 
 /* ── NAVIGATION ── */
+/* ── MOBILE MENU ── */
+function toggleMobMenu(){
+  const sb=document.querySelector('.sidebar');
+  const ov=document.getElementById('mobOverlay');
+  const open=sb.classList.toggle('mob-open');
+  ov.classList.toggle('mob-open',open);
+  document.body.style.overflow=open?'hidden':'';
+}
+function closeMobMenu(){
+  document.querySelector('.sidebar').classList.remove('mob-open');
+  document.getElementById('mobOverlay').classList.remove('mob-open');
+  document.body.style.overflow='';
+}
+
 async function show(page){
+  // Close mobile drawer on navigation
+  closeMobMenu();
+  // Highlight sidebar nav
   document.querySelectorAll('#nav a[data-p]').forEach(a=>a.classList.toggle('active',a.dataset.p===page));
+  // Highlight mobile bottom nav
+  document.querySelectorAll('.mob-nav-item[data-p]').forEach(b=>b.classList.toggle('active',b.dataset.p===page));
   const titles={dashboard:'仪表盘',schedule:'赛程管理',events:'赛事列表',venues:'场馆管理',import:'导入数据',audit:'操作日志',export:'导出报表'};
   document.getElementById('pageTitle').textContent=titles[page]||page;
   document.getElementById('pageActions').innerHTML='';
@@ -2726,5 +2810,23 @@ document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>
 /* ── INIT ── */
 checkAuth();
 </script>
+<!-- Mobile bottom nav -->
+<nav class="mob-nav" id="mobBottomNav">
+  <button class="mob-nav-item" data-p="dashboard" onclick="show('dashboard');closeMobMenu()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>首页
+  </button>
+  <button class="mob-nav-item" data-p="schedule" onclick="show('schedule');closeMobMenu()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>赛程
+  </button>
+  <button class="mob-nav-item" data-p="import" onclick="show('import');closeMobMenu()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>导入
+  </button>
+  <button class="mob-nav-item" data-p="export" onclick="show('export');closeMobMenu()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>导出
+  </button>
+  <button class="mob-nav-item" data-p="events" onclick="show('events');closeMobMenu()">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>赛事
+  </button>
+</nav>
 </body>
 </html>
