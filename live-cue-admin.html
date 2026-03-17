@@ -2226,8 +2226,10 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
   const dateKeys=Object.keys(groups).sort();
   if(!dateKeys.length){alert('没有可导出的数据');return;}
   const DAYS='日一二三四五六';
-  const seqW=36,venueW=isT?120:100,sportW=isT?0:160,stdW=46;
-  const pxPerHr=72,rowH=isT?46:38;
+  // Column widths (px)
+  const seqW=36, venueW=isT?130:110, sportW=isT?0:170, stdW=isT?52:52;
+  const leftW=seqW+venueW+sportW+stdW;
+  const pxPerHr=isT?80:72, rowH=isT?44:36;
   const TEAM_KW=['水球','三人篮球','沙滩足球','沙滩手球','沙滩卡巴迪','龙舟','沙滩排球'];
   const pagesHtml=dateKeys.map((date,pageIdx)=>{
     const evts=groups[date];
@@ -2245,35 +2247,31 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
         return e.start_time+(isTeamEv?-10:-5)*60000;
       }));
       const earliestCueMin=Math.floor((earliestCueMs-dayMs)/60000);
-      // Start 30 min before earliest cue, snapped to 30-min grid
       startMin=Math.min(startMin, Math.floor((earliestCueMin-30)/30)*30);
     }
     const endMin=Math.ceil((maxMs-dayMs)/60000/60)*60+60;
     const totalMin=endMin-startMin;
-    const totalPx=totalMin/60*pxPerHr;
+    const totalPx=Math.round(totalMin/60*pxPerHr);
     const msPerPx=60000*60/pxPerHr;
-    // Time header ticks (inside <th>)
-    let hTicks='';
+    const tableW=leftW+totalPx;
+    const thH=28; // time axis header row height
+
+    // ── Time header ticks (labels + major grid lines) ──
+    let hTicks='', gTicks='';
     for(let m=startMin;m<=endMin;m+=60){
-      const x=(m-startMin)/60*pxPerHr;
+      const x=Math.round((m-startMin)/60*pxPerHr);
       const hh=Math.floor((m+1440)%1440/60);
-      hTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;border-left:1px solid #fff;pointer-events:none"><span style="position:absolute;top:50%;left:4px;transform:translateY(-50%);font-size:8px;font-weight:bold;color:#fff;white-space:nowrap">${p2(hh)}:00</span></div>`;
+      hTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.5)"></div>`
+             +`<span style="position:absolute;left:${x+3}px;top:50%;transform:translateY(-50%);font-size:8px;font-weight:700;color:#fff;white-space:nowrap;font-family:monospace">${p2(hh)}:00</span>`;
+      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:#cbd5e1"></div>`;
     }
     for(let m=startMin+30;m<endMin;m+=60){
-      const x=(m-startMin)/60*pxPerHr;
-      hTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;border-left:1px dashed #aac4e0;pointer-events:none"></div>`;
+      const x=Math.round((m-startMin)/60*pxPerHr);
+      hTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2)"></div>`;
+      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:#edf2f7;border-left:1px dashed #edf2f7"></div>`;
     }
-    // Grid ticks for event rows (major solid + minor dashed)
-    let gTicks='';
-    for(let m=startMin;m<=endMin;m+=60){
-      const x=(m-startMin)/60*pxPerHr;
-      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;border-left:1px solid #cbd5e1;pointer-events:none;z-index:0"></div>`;
-    }
-    for(let m=startMin+30;m<endMin;m+=60){
-      const x=(m-startMin)/60*pxPerHr;
-      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;border-left:1px dashed #edf2f7;pointer-events:none;z-index:0"></div>`;
-    }
-    // Build table rows
+
+    // ── Build table rows ──
     let rowsHtml=''; let seqNum=0;
     (VENUES||[]).forEach(venue=>{
       const vEvts=evts.filter(e=>e.venue_id===venue.id);
@@ -2298,122 +2296,107 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
           if(lanes.length>1) lanes.forEach((ln,i)=>{ln.label=`场地${i+1}`;});
         }
       }catch(_){lanes=[{label:'',evts:vEvts}];}
+
       lanes.forEach((lane,li)=>{
         seqNum++;
         const isFirst=(li===0);
         const bg=(seqNum%2===0)?'#f5f7fa':'#ffffff';
-        // ── Per-event blocks: cue marker only when gap > 2h from prev event ──
         const team=TEAM_KW.some(k=>(venue.name||'').includes(k));
         const cueMin=team?-10:-5;
-        const GAP_THRESHOLD=2*60*60000; // 2 hours in ms
+        const GAP_THRESHOLD=2*60*60000;
         const sortedEvts=lane.evts.slice().sort((a,b)=>a.start_time-b.start_time);
-        // Pre-compute which events need a cue marker
         const needsCue=sortedEvts.map((ev,ei)=>{
           if(!isT) return false;
-          if(ei===0) return true; // first event always gets cue
-          const prevEnd=sortedEvts[ei-1].end_time;
-          return (ev.start_time-prevEnd)>GAP_THRESHOLD;
+          if(ei===0) return true;
+          return (ev.start_time-sortedEvts[ei-1].end_time)>GAP_THRESHOLD;
         });
-        // Event blocks — detect overlapping events within lane → stack into sub-rows
-        // Assign each event a sub-lane index (0=top, 1=bottom, etc.)
-        const subLanes=[]; // array of end_time for each sub-lane
-        const subLaneIdx=sortedEvts.map(ev=>{
-          for(let i=0;i<subLanes.length;i++){
-            if(ev.start_time>=subLanes[i]){subLanes[i]=ev.end_time;return i;}
-          }
-          subLanes.push(ev.end_time);return subLanes.length-1;
+        // Sub-lane collision detection within this lane
+        const subEnds=[];
+        const subIdx=sortedEvts.map(ev=>{
+          for(let i=0;i<subEnds.length;i++){if(ev.start_time>=subEnds[i]){subEnds[i]=ev.end_time;return i;}}
+          subEnds.push(ev.end_time);return subEnds.length-1;
         });
-        const numSubLanes=Math.max(1,subLanes.length);
-        const subH=Math.max(16,Math.floor((rowH-4)/numSubLanes));
+        const numSub=Math.max(1,subEnds.length);
+        const dynH=Math.max(rowH, numSub*rowH);
+        const subH=Math.floor(dynH/numSub);
+
+        // Event blocks
         let blocks='';
         sortedEvts.forEach((ev,ei)=>{
-          const x=Math.max(0,(ev.start_time-dayMs-startMin*60000)/msPerPx);
-          const w=Math.max(6,(ev.end_time-ev.start_time)/msPerPx);
+          const ex=Math.max(0,Math.round((ev.start_time-dayMs-startMin*60000)/msPerPx));
+          const ew=Math.max(8,Math.round((ev.end_time-ev.start_time)/msPerPx));
           const stStr=`${p2(new Date(ev.start_time).getHours())}:${p2(new Date(ev.start_time).getMinutes())}`;
-          const si=subLaneIdx[ei];
-          const top=2+si*subH;
-          const blockH=subH-2;
+          const si=subIdx[ei];
+          const bTop=si*subH+2;
+          const bH=subH-4;
           if(needsCue[ei]){
             const cueMs=ev.start_time+cueMin*60000;
-            const cueX=x+(cueMin*60000)/msPerPx;
+            const cueX=Math.round((cueMs-dayMs-startMin*60000)/msPerPx);
             const cueStr=`${p2(new Date(cueMs).getHours())}:${p2(new Date(cueMs).getMinutes())}`;
-            // cue line spans full row height; label positioned at this sub-lane
-            blocks+=`<div style="position:absolute;left:${cueX}px;top:0;bottom:0;width:2px;background:#dc2626;z-index:3;pointer-events:none"><span style="position:absolute;top:${top}px;left:3px;font-size:7px;font-weight:bold;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.4">${cueStr}</span></div>`;
+            blocks+=`<div style="position:absolute;left:${cueX}px;top:0;bottom:0;width:2px;background:#dc2626;z-index:4">`
+                   +`<span style="position:absolute;top:${bTop}px;left:3px;font-size:7.5px;font-weight:700;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.5">${cueStr}</span>`
+                   +`</div>`;
           }
           const blkColor=isT?(ev.is_medal_event?'#e07b1a':'#3a8c4e'):venue.color;
-          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:${top}px;height:${blockH}px;background:${blkColor};overflow:hidden;z-index:${2+si};padding:1px 4px;box-sizing:border-box;border-radius:2px"><div style="font-size:${numSubLanes>1?6.5:7}px;font-weight:bold;color:#fff;line-height:1.2;word-break:break-all;overflow:hidden;max-height:${blockH<=16?'1.3em':'2.5em'}">${ev.name}</div>${blockH>14?`<div style="font-size:6px;color:rgba(255,255,255,.9);line-height:1.1">${stStr}</div>`:''}</div>`;
+          const fs=numSub>1?6.5:7.5;
+          blocks+=`<div style="position:absolute;left:${ex}px;width:${ew}px;top:${bTop}px;height:${bH}px;background:${blkColor};overflow:hidden;z-index:${2+si};padding:1px 3px;box-sizing:border-box;border-radius:2px">`
+                 +`<div style="font-size:${fs}px;font-weight:700;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:${bH<=14?'1.2em':'2.4em'}">${ev.name}</div>`
+                 +(bH>13?`<div style="font-size:6px;color:rgba(255,255,255,.9);line-height:1.1">${stStr}</div>`:'')
+                 +`</div>`;
         });
-        // Sport/round cell — show time for all events
+
+        // Sport/round cell content
         const fmtT=ms=>{const d=new Date(ms);return `${p2(d.getHours())}:${p2(d.getMinutes())}`;};
-        let spContent;
+        let spContent='';
         if(!isT){
-          if(lane.evts.length===1){
-            const ev=lane.evts[0];
-            const tRange=`${fmtT(ev.start_time)}–${fmtT(ev.end_time)}`;
-            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>
-              <div style="display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap">
-                <span style="font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:1px 5px;border-radius:3px;white-space:nowrap;font-family:monospace">${tRange}</span>
-                ${ev.round?`<span style="font-size:7.5px;color:#64748b">${ev.round}</span>`:''}
-              </div>`;
+          if(sortedEvts.length===1){
+            const ev=sortedEvts[0];
+            spContent=`<div style="font-size:8px;font-weight:600;color:#0f172a;line-height:1.3;word-break:break-all">${ev.name}</div>`
+                     +`<div style="margin-top:2px"><span style="font-size:7.5px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:1px 4px;border-radius:3px;font-family:monospace">${fmtT(ev.start_time)}–${fmtT(ev.end_time)}</span>${ev.round?` <span style="font-size:7px;color:#64748b">${ev.round}</span>`:''}</div>`;
           } else {
-            const evList=sortedEvts.map(ev=>`<div style="font-size:7.5px;color:#1e293b;display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-family:monospace;font-weight:700;color:#1d4ed8;white-space:nowrap;flex-shrink:0">${fmtT(ev.start_time)}</span><span style="word-break:break-all;line-height:1.25">${ev.name}</span></div>`).join('');
-            spContent=`<div style="font-size:8px;color:#475569;margin-bottom:1px">共 <strong style="color:#0f172a">${lane.evts.length}</strong> 场赛事</div>${evList}`;
-          }
-        } else {
-          // Show cue time info for events that need a cue marker
-          const cueEvts=sortedEvts.filter((_,ei)=>needsCue[ei]);
-          if(cueEvts.length===1&&sortedEvts.length===1){
-            // Single event
-            const ev=cueEvts[0];
-            const cueMs=ev.start_time+cueMin*60000;
-            const cueStr=fmtT(cueMs);
-            const stStr2=fmtT(ev.start_time);
-            const enStr2=fmtT(ev.end_time);
-            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>
-              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;flex-wrap:wrap">
-                <span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px;white-space:nowrap">传送 ${cueStr}</span>
-                <span style="font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:1px 4px;border-radius:3px;white-space:nowrap;font-family:monospace">${stStr2}–${enStr2}</span>
-              </div>`;
-          } else {
-            // Multiple events: list only those that need a cue, rest show as count
-            // Show all events with time, highlight those needing cue
-            const evLines=sortedEvts.map((ev,ei)=>{
-              const hasCue=needsCue[ei];
-              const tRange=`${fmtT(ev.start_time)}–${fmtT(ev.end_time)}`;
-              const cueTag=hasCue?`<span style="font-size:7.5px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px;white-space:nowrap">传送 ${fmtT(ev.start_time+cueMin*60000)}</span> `:'';
-              return `<div style="font-size:7.5px;color:#1e293b;display:flex;align-items:baseline;gap:3px;margin-top:2px;flex-wrap:wrap">${cueTag}<span style="font-family:monospace;font-weight:700;color:#1d4ed8;white-space:nowrap">${tRange}</span><span style="word-break:break-all;line-height:1.25">${ev.name}</span></div>`;
-            });
-            spContent=`<div style="font-size:8px;color:#475569;margin-bottom:1px">共 <strong style="color:#0f172a">${sortedEvts.length}</strong> 场赛事</div>${evLines.join('')}`;
+            const lines=sortedEvts.map(ev=>`<div style="font-size:7px;color:#0f172a;display:flex;gap:4px;align-items:baseline;margin-top:1px"><span style="font-family:monospace;font-weight:700;color:#1d4ed8;white-space:nowrap;flex-shrink:0">${fmtT(ev.start_time)}</span><span style="word-break:break-all;line-height:1.2">${ev.name}</span></div>`).join('');
+            spContent=`<div style="font-size:7.5px;color:#475569;font-weight:600;margin-bottom:1px">共${sortedEvts.length}场</div>${lines}`;
           }
         }
-                // Venue cell
+
+        // Venue cell content
         const vContent=isFirst
-          ?`<div style="font-size:9.5px;font-weight:700;color:#0f172a;word-break:break-all;line-height:1.3">${venue.short_name||venue.name}</div>${lane.label?`<div style="font-size:8px;color:${venue.color};font-weight:600;margin-top:2px">${lane.label}</div>`:''}`
-          :`<div style="font-size:8.5px;color:${venue.color};font-weight:600;padding-left:8px;word-break:break-all">${lane.label||venue.short_name||venue.name}</div>`;
-        // Std cell
-        const stdContent=isT?`<span style="display:inline-block;font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:2px 6px;border-radius:3px;white-space:nowrap">HD 1080</span>`:`<span style="color:#94a3b8;font-size:9px">—</span>`;
-        const dynH=Math.max(rowH,numSubLanes*(rowH*0.6+2)+4);
-        rowsHtml+=`<tr style="min-height:${dynH}px;background:${bg}">
-          <td style="width:${seqW}px;text-align:center;font-size:9.5px;font-weight:600;color:#64748b;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${seqNum}</td>
-          <td style="width:${venueW}px;padding:3px 8px;vertical-align:middle;border-left:3px solid ${venue.color};border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${vContent}</td>
-          ${isT?'':String.raw`<td style="width:${sportW}px;padding:3px 8px;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${spContent}</td>`}
-          <td style="width:${stdW}px;text-align:center;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${stdContent}</td>
-          <td style="position:relative;overflow:hidden;border-bottom:1px solid #dde3ea;height:${dynH}px;min-height:${dynH}px">${gTicks}${blocks}</td>
+          ?`<div style="font-size:9px;font-weight:700;color:#0f172a;line-height:1.3;word-break:break-all">${venue.short_name||venue.name}</div>`
+           +(lane.label?`<div style="font-size:7.5px;color:${venue.color};font-weight:600;margin-top:1px">${lane.label}</div>`:
+             `<div style="font-size:7px;color:#94a3b8;margin-top:1px">${venue.name}</div>`)
+          :`<div style="font-size:8px;color:${venue.color};font-weight:600;padding-left:6px;word-break:break-all">${lane.label||venue.short_name||venue.name}</div>`;
+
+        // Std/HD cell
+        const stdContent=isT
+          ?`<div style="font-size:7.5px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:2px 4px;border-radius:3px;text-align:center;line-height:1.2">HD<br>1080</div>`
+          :`<span style="color:#94a3b8;font-size:9px">—</span>`;
+
+        const bd='1px solid #d1d8e0';
+        rowsHtml+=`<tr style="background:${bg}">
+          <td style="width:${seqW}px;height:${dynH}px;text-align:center;font-size:9px;font-weight:600;color:#64748b;border-right:${bd};border-bottom:${bd};vertical-align:middle">${seqNum}</td>
+          <td style="width:${venueW}px;height:${dynH}px;padding:3px 6px;border-left:3px solid ${venue.color};border-right:${bd};border-bottom:${bd};vertical-align:middle">${vContent}</td>
+          ${isT?'':`<td style="width:${sportW}px;height:${dynH}px;padding:3px 6px;border-right:${bd};border-bottom:${bd};vertical-align:top">${spContent}</td>`}
+          <td style="width:${stdW}px;height:${dynH}px;text-align:center;border-right:${bd};border-bottom:${bd};vertical-align:middle;padding:2px">${stdContent}</td>
+          <td style="width:${totalPx}px;height:${dynH}px;padding:0;border-bottom:${bd}">
+            <div style="position:relative;width:${totalPx}px;height:${dynH}px;overflow:hidden">${gTicks}${blocks}</div>
+          </td>
         </tr>`;
       });
     });
+
     // Legend row
-    const legendHtml=`<tr style="background:#f1f5f9;border-top:2px solid #94a3b8">
-      <td colspan="5" style="padding:5px 14px">
-        <div style="display:flex;align-items:center;gap:18px;font-size:8px;color:#475569;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:5px"><div style="width:18px;height:10px;background:${isT?'#3a8c4e':'#3b82f6'};border-radius:2px"></div>${isT?'普通竞赛（青草绿）':'普通赛事'}</div>
-          <div style="display:flex;align-items:center;gap:5px"><div style="width:18px;height:10px;background:${isT?'#e07b1a':'#f59e0b'};border-radius:2px"></div>${isT?'金牌产生（橙色）':'含颁奖 &#127941;'}</div>
-          ${isT?`<div style="display:flex;align-items:center;gap:5px"><div style="width:2px;height:14px;background:#dc2626"></div>红线 = 传送提示时间</div>`:''}
-          <div style="margin-left:auto;color:#94a3b8;font-size:7.5px">注：时间以${isT?'传送提示时间（比赛前提前量）':'赛事开始时间'}为准 · Live-CUE 赛程管理系统 · 第六届亚洲沙滩运动会 三亚 2026</div>
+    const colspan=isT?4:5;
+    const legendHtml=`<tr style="background:#f1f5f9">
+      <td colspan="${colspan}" style="padding:5px 12px;border-top:2px solid #94a3b8">
+        <div style="display:flex;align-items:center;gap:14px;font-size:8px;color:#475569;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:4px"><div style="width:16px;height:10px;background:${isT?'#3a8c4e':'#3b82f6'};border-radius:2px"></div>${isT?'普通竞赛':'普通赛事'}</div>
+          <div style="display:flex;align-items:center;gap:4px"><div style="width:16px;height:10px;background:${isT?'#e07b1a':'#f59e0b'};border-radius:2px"></div>${isT?'金牌产生':'含颁奖'}</div>
+          ${isT?'<div style="display:flex;align-items:center;gap:4px"><div style="width:2px;height:14px;background:#dc2626"></div>传送提示时间</div>':''}
+          <div style="margin-left:auto;color:#94a3b8;font-size:7px">Live-CUE · 第六届亚洲沙滩运动会 · Sanya 2026</div>
         </div>
       </td>
     </tr>`;
-    const tableW=seqW+venueW+sportW+stdW+totalPx;
+
     return `<div class="pg">
 <header class="ph">
   <div class="ph-top">
@@ -2422,18 +2405,31 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
     <div class="ph-rt"><div class="ph-type">${isT?'传 送 表':'赛 程 表'}</div><div class="ph-date">${dateStr} 周${DAYS[dt.getDay()]}</div></div>
   </div>
   <div class="ph-div"></div>
-  <div class="ph-info"><span>导出时间：${nowStr}</span><span>第 ${pageIdx+1} 页 / 共 ${dateKeys.length} 页</span><span>本页赛事：${evts.length} 场</span>${isT?`<span style="color:#fca5a5">● 红线 = 传送提示时间</span>`:''}</div>
+  <div class="ph-info">
+    <span>导出时间：${nowStr}</span>
+    <span>第 ${pageIdx+1} 页 / 共 ${dateKeys.length} 页</span>
+    <span>本页赛事：${evts.length} 场</span>
+    ${isT?'<span style="color:#fca5a5">● 红线 = 传送提示时间</span>':''}
+  </div>
 </header>
-<div style="overflow-x:auto">
-<table style="width:${tableW}px;border-collapse:collapse;table-layout:fixed;border:1.5px solid #94a3b8">
-<colgroup><col style="width:${seqW}px"><col style="width:${venueW}px">${isT?'':`<col style="width:${sportW}px">`}<col style="width:${stdW}px"><col></colgroup>
+<div style="width:${tableW}px">
+<table style="width:${tableW}px;border-collapse:collapse;table-layout:fixed">
+<colgroup>
+  <col style="width:${seqW}px">
+  <col style="width:${venueW}px">
+  ${isT?'':`<col style="width:${sportW}px">`}
+  <col style="width:${stdW}px">
+  <col style="width:${totalPx}px">
+</colgroup>
 <thead>
-<tr style="background:#1e3a5f;height:30px">
-  <th style="text-align:center;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">序号</th>
-  <th style="text-align:left;padding-left:9px;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">场馆名称</th>
-  ${isT?'':String.raw`<th style="text-align:left;padding-left:9px;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">赛事 / 赛次</th>`}
-  <th style="text-align:center;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2)">${isT?'制式':'备注'}</th>
-  <th style="position:relative;overflow:hidden;padding:0">${hTicks}</th>
+<tr style="background:#1e3a5f;height:${thH}px">
+  <th style="text-align:center;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2);width:${seqW}px">序号</th>
+  <th style="text-align:left;padding-left:8px;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2);width:${venueW}px">场馆名称</th>
+  ${isT?'':`<th style="text-align:left;padding-left:8px;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2);width:${sportW}px">赛事 / 赛次</th>`}
+  <th style="text-align:center;font-size:8px;font-weight:700;color:#fff;border-right:1px solid rgba(255,255,255,.2);width:${stdW}px">${isT?'制式':'备注'}</th>
+  <th style="padding:0;width:${totalPx}px">
+    <div style="position:relative;width:${totalPx}px;height:${thH}px;overflow:hidden;background:#1e3a5f">${hTicks}</div>
+  </th>
 </tr>
 </thead>
 <tbody>${rowsHtml}${legendHtml}</tbody>
@@ -2442,77 +2438,37 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
 <footer class="pf"><span>第六届亚洲沙滩运动会 · Live-CUE 赛程管理系统</span><span>${dateStr} · 第 ${pageIdx+1} 页</span></footer>
 </div>`;
   }).join('');
-  const tableMaxW=seqW+venueW+sportW+stdW+800;
+
   const html=`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>${fileName}</title><style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 @page{size:${orient==='portrait'?'A4 portrait':'A3 landscape'};margin:8mm}
 body{font-family:'Microsoft YaHei','Heiti SC',Arial,sans-serif;font-size:12px;color:#1a202c;background:#e2e8f0}
-.pg{background:#fff;max-width:${tableMaxW}px;margin:14px auto;overflow:hidden;page-break-after:always}
-.ph{background:#1e3a5f!important;color:#fff;padding:14px 20px 0}
-.ph-top{display:flex;align-items:center;gap:14px;padding-bottom:10px}
+.pg{background:#fff;display:inline-block;min-width:100%;margin:14px auto;page-break-after:always;overflow:hidden}
+.ph{background:#1e3a5f!important;color:#fff;padding:12px 18px 0}
+.ph-top{display:flex;align-items:center;gap:12px;padding-bottom:8px}
 .ph-txt{flex:1}
-.ph-main{font-size:17px;font-weight:700;letter-spacing:.1em;color:#fff}
-.ph-sub{font-size:9px;color:#c8dff5;margin-top:2px;letter-spacing:.05em}
+.ph-main{font-size:16px;font-weight:700;letter-spacing:.1em;color:#fff}
+.ph-sub{font-size:9px;color:#c8dff5;margin-top:2px}
 .ph-rt{text-align:right}
-.ph-type{font-size:14px;font-weight:700;letter-spacing:.2em;background:#2d5a8e!important;border:1px solid #6ea3d4;padding:4px 14px;border-radius:4px;display:inline-block;color:#fff}
-.ph-date{font-size:10px;color:#c8dff5;margin-top:4px}
+.ph-type{font-size:13px;font-weight:700;letter-spacing:.15em;background:#2d5a8e!important;border:1px solid #6ea3d4;padding:3px 12px;border-radius:4px;display:inline-block;color:#fff}
+.ph-date{font-size:9px;color:#c8dff5;margin-top:3px}
 .ph-div{height:1px;background:#4a7aad!important}
-.ph-info{display:flex;justify-content:space-between;padding:5px 0 8px;font-size:9px;color:#c8dff5;gap:16px}
-.pf{display:flex;justify-content:space-between;padding:7px 20px;background:#1e3a5f!important;font-size:9px;color:#c8dff5}
-table{border-collapse:collapse;width:100%}
+.ph-info{display:flex;gap:16px;padding:4px 0 7px;font-size:8.5px;color:#c8dff5}
+.pf{display:flex;justify-content:space-between;padding:6px 18px;background:#1e3a5f!important;font-size:8px;color:#c8dff5}
+table{border-collapse:collapse}
 td,th{padding:0;vertical-align:middle}
-tr{page-break-inside:avoid}
 @media print{
   body{background:#fff}
-  .pg{margin:0;max-width:none;width:100%}
+  .pg{margin:0;display:block}
   .pg+.pg{page-break-before:always}
 }
 </style></head><body>${pagesHtml}</body></html>`;
-  const w=window.open('','_blank','width=1360,height=920,scrollbars=yes');
+  const w=window.open('','_blank','width=1400,height=960,scrollbars=yes');
   if(!w){alert('请允许弹出窗口以生成PDF');return;}
   w.document.write(html);w.document.close();
-  setTimeout(()=>w.print(),1000);
+  setTimeout(()=>w.print(),1200);
 }
 
-
-/* legacy stub – kept for any old references */
-async function exportReport(type){await renderExport();}
-
-/* ── AUDIT ── */
-async function renderAudit(){
-  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
-  const {data}=await db.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(50);
-  LOGS=data||[];
-  const icons={create:'＋',update:'✎',delete:'✕',import:'⇧',login:'◉'};
-  document.getElementById('content').innerHTML=`
-    <div class="section">
-      <div class="sec-head"><span class="sec-title">操作日志</span><span class="sec-cnt">最近50条</span></div>
-      ${LOGS.length?LOGS.map(l=>`
-        <div class="log-row">
-          <div class="log-icon ${l.action}">${icons[l.action]||'●'}</div>
-          <div class="log-body">
-            <div class="log-action">${l.summary||`${l.action} · ${l.table_name}`}</div>
-            <div class="log-meta">${l.user_email||'system'} · ${fmtDT(new Date(l.created_at).getTime())}</div>
-          </div>
-        </div>`).join(''):'<div style="padding:30px;text-align:center;color:var(--t3)">暂无日志（需运行 SQL 脚本启用审计功能）</div>'}
-    </div>`;
-}
-
-/* ── HELPERS ── */
-async function loadVenueMap(){
-  if(VENUES.length) return;
-  const {data}=await db.from('venues').select('*').order('name');
-  VENUES=data||[];
-}
-async function logAction(action,table,summary){
-  if(!CUR_USER) return;
-  // Use service role key to bypass RLS for audit_logs (no INSERT policy needed)
-  await fetch(`${SB_URL}/rest/v1/audit_logs`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC},
-    body:JSON.stringify({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary})
-  }).catch(()=>{});
-}
 function statusBadge(s){
   const map={live:'<span class="badge live"><span class="dot live"></span>直播中</span>',scheduled:'<span class="badge sched">计划中</span>',finished:'<span class="badge done">已完成</span>',cancelled:'<span class="badge done">已取消</span>',completed:'<span class="badge done">已完成</span>'};
   return map[s]||`<span class="badge">${s}</span>`;
