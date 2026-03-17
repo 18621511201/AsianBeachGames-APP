@@ -1549,41 +1549,58 @@ ${rawText.slice(0,12000)}
     }
     const data=await resp.json();
     let txt=data.content[0].text.trim();
-    // Strip markdown code fences if present
+    // Strip markdown code fences
     txt=txt.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
 
-    // Extract balanced JSON structure using bracket counter (handles trailing text)
-    function extractBalanced(s, open, close){
-      const start=s.indexOf(open); if(start===-1) return null;
-      let depth=0,inStr=false,esc=false;
-      for(let i=start;i<s.length;i++){
-        const c=s[i];
-        if(esc){esc=false;continue;}
-        if(c==='\\'&&inStr){esc=true;continue;}
-        if(c==='"'){inStr=!inStr;continue;}
-        if(inStr) continue;
-        if(c===open||c==='{') depth++;
-        else if(c===close||c==='}'){depth--;if(depth===0) return s.slice(start,i+1);}
+    // Recursively find the largest array anywhere in a parsed object
+    function findDeepArray(val){
+      if(Array.isArray(val)) return val;
+      if(val&&typeof val==='object'){
+        let best=null;
+        for(const v of Object.values(val)){
+          const found=findDeepArray(v);
+          if(found&&(!best||found.length>best.length)) best=found;
+        }
+        return best;
       }
       return null;
     }
 
-    // First try to extract a top-level array
-    const arrStr=extractBalanced(txt,'[',']');
-    if(arrStr){
-      _aiParsedEvents=JSON.parse(arrStr);
+    // Try to parse the whole text first (handles clean JSON responses)
+    let parsed=null;
+    try{ parsed=JSON.parse(txt); }catch(_){}
+
+    if(parsed){
+      _aiParsedEvents=Array.isArray(parsed)?parsed:(findDeepArray(parsed)||[]);
     } else {
-      // Try object wrapper e.g. {"events":[...]}
-      const objStr=extractBalanced(txt,'{','}');
-      if(objStr){
-        const obj=JSON.parse(objStr);
-        const arr=Object.values(obj).find(v=>Array.isArray(v));
-        if(arr) _aiParsedEvents=arr;
-        else throw new Error('AI 返回对象中未找到数组');
-      } else {
-        throw new Error('AI 返回内容无法解析为 JSON，原始：'+txt.slice(0,300));
+      // Find first complete JSON structure (array or object) using bracket scan
+      function extractFirst(s, open, close){
+        const start=s.indexOf(open); if(start===-1) return null;
+        let d=0,inStr=false,esc=false;
+        for(let i=start;i<s.length;i++){
+          const c=s[i];
+          if(esc){esc=false;continue;}
+          if(c==='\\'&&inStr){esc=true;continue;}
+          if(c==='"'){inStr=!inStr;continue;}
+          if(inStr) continue;
+          if(c==='['||c==='{') d++;
+          else if(c===']'||c==='}'){d--;if(d===0) return s.slice(start,i+1);}
+        }
+        return null;
       }
+      const arrStr=extractFirst(txt,'[',']');
+      const objStr=extractFirst(txt,'{','}');
+      // Use whichever comes first in the text
+      const aPos=txt.indexOf('['), oPos=txt.indexOf('{');
+      const useArr=arrStr&&(oPos===-1||aPos<=oPos);
+      const candidate=useArr?arrStr:objStr;
+      if(!candidate) throw new Error('AI 返回内容中未找到 JSON，原始：'+txt.slice(0,300));
+      try{
+        const p=JSON.parse(candidate);
+        _aiParsedEvents=Array.isArray(p)?p:(findDeepArray(p)||[]);
+      }catch(pe){throw new Error('JSON 解析失败：'+pe.message+'\n片段：'+candidate.slice(0,200));}
     }
+    if(!_aiParsedEvents.length) throw new Error('AI 未能从文件中提取到任何赛事，请检查文件内容是否包含赛程数据');
     document.getElementById('fileStatus').innerHTML=`<span style="color:var(--ok)">✓ AI 解析完成，发现 ${_aiParsedEvents.length} 条赛事</span>`;
     renderAiResult(_aiParsedEvents, fileName);
     await logAction('import','events',`AI解析文件 [${fileName}] 发现 ${_aiParsedEvents.length} 条赛事`);
