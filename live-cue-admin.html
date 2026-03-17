@@ -2283,7 +2283,11 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
             return `<div style="font-size:8px;font-weight:600;color:#1e293b;line-height:1.3;word-break:break-all${si>0?';margin-top:4px;padding-top:3px;border-top:1px dashed #e2e8f0':''}">${sessLabel}</div><div style="display:flex;align-items:center;gap:5px;margin-top:1px;flex-wrap:wrap"><span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px;white-space:nowrap">传送 ${cueStr}</span><span style="font-size:7px;color:#64748b;white-space:nowrap">开始 ${stStr2}（提前${Math.abs(cueMin)}分钟）</span></div>`;
           }).join('');
         }
-                // Std cell
+                // Venue cell
+        const vContent=isFirst
+          ?`<div style="font-size:9.5px;font-weight:700;color:#0f172a;word-break:break-all;line-height:1.3">${venue.short_name||venue.name}</div>${lane.label?`<div style="font-size:8px;color:${venue.color};font-weight:600;margin-top:2px">${lane.label}</div>`:''}`
+          :`<div style="font-size:8.5px;color:${venue.color};font-weight:600;padding-left:8px;word-break:break-all">${lane.label||venue.short_name||venue.name}</div>`;
+        // Std cell
         const stdContent=isT?`<span style="display:inline-block;font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:2px 6px;border-radius:3px;white-space:nowrap">HD 1080</span>`:`<span style="color:#94a3b8;font-size:9px">—</span>`;
         rowsHtml+=`<tr style="min-height:${rowH}px;background:${bg}">
           <td style="width:${seqW}px;text-align:center;font-size:9.5px;font-weight:600;color:#64748b;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${seqNum}</td>
