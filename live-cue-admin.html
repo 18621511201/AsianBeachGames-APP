@@ -2093,9 +2093,12 @@ function buildGanttDay(date, dayEvts, isT, pxPerHr, rowH, _leftW, forPrint){
         :(lane.evts.length===1
           ?`<span style="font-size:9px;color:${forPrint?'#475569':'rgba(255,255,255,.45)'}">${lane.evts[0].round||'—'}</span>`
           :`<span style="font-size:9px;color:${forPrint?'#475569':'rgba(255,255,255,.45)'}">共 ${lane.evts.length} 场</span>`);
-      // Std cell (HD badge for transmission)
+      // Std cell (HD/4K badge for transmission; 攀岩 uses 4K)
+      const is4K=/攀岩/.test(venue.name||'')||/攀岩/.test(venue.sport||'');
       const stdHtml=isT
-        ?`<span style="font-size:8px;font-weight:700;color:${forPrint?'#1d4ed8':'#93c5fd'};background:${forPrint?'#dbeafe':'rgba(59,130,246,.2)'};padding:1px 5px;border-radius:3px">HD</span>`
+        ?(is4K
+          ?`<span style="font-size:8px;font-weight:700;color:${forPrint?'#065f46':'#6ee7b7'};background:${forPrint?'#d1fae5':'rgba(16,185,129,.2)'};padding:1px 5px;border-radius:3px">4K</span>`
+          :`<span style="font-size:8px;font-weight:700;color:${forPrint?'#1d4ed8':'#93c5fd'};background:${forPrint?'#dbeafe':'rgba(59,130,246,.2)'};padding:1px 5px;border-radius:3px">HD</span>`)
         :'';
       // Event blocks
       let blocks='';
