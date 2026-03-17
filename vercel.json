@@ -9,5 +9,14 @@
   "routes": [
     { "src": "/admin", "dest": "/live-cue-admin.html" },
     { "src": "/", "dest": "/live-cue-themes.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)\\.html",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache, no-store, must-revalidate" },
+        { "key": "Pragma", "value": "no-cache" }
+      ]
+    }
   ]
 }
