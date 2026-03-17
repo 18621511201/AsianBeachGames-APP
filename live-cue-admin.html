@@ -2770,16 +2770,29 @@ body{font-family:'Microsoft YaHei','Heiti SC',Arial,sans-serif;font-size:12px;co
 .pf{display:flex;justify-content:space-between;padding:6px 18px;background:#1e3a5f!important;font-size:8px;color:#c8dff5}
 table{border-collapse:collapse}
 td,th{padding:0;vertical-align:middle}
+#pdfbar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3a5f;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 20px;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:Arial,sans-serif;font-size:13px}
+#pdfbar button{background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px}
+#pdfbar button:hover{background:#1d4ed8}
+#pdfbar .hint{font-size:11px;color:#c8dff5;flex:1}
+#pdfbar .close-btn{background:rgba(255,255,255,.15);padding:6px 14px;font-weight:400;font-size:12px}
+#pdfbar .close-btn:hover{background:rgba(255,255,255,.25)}
+body.has-bar{padding-top:52px}
 @media print{
-  body{background:#fff}
+  #pdfbar{display:none!important}
+  body{background:#fff;padding-top:0!important}
   .pg{margin:0;display:block}
   .pg+.pg{page-break-before:always}
 }
-</style></head><body>${pagesHtml}</body></html>`;
+</style></head><body class="has-bar">
+<div id="pdfbar">
+  <button onclick="window.print()">📥 保存为 PDF</button>
+  <span class="hint">点击按钮 → 弹出打印对话框 → 打印机选择「另存为 PDF」→ 保存</span>
+  <button class="close-btn" onclick="document.getElementById('pdfbar').style.display='none';document.body.classList.remove('has-bar')">✕ 关闭提示</button>
+</div>
+${pagesHtml}</body></html>`;
   const w=window.open('','_blank','width=1400,height=960,scrollbars=yes');
   if(!w){alert('请允许弹出窗口以生成PDF');return;}
   w.document.write(html);w.document.close();
-  setTimeout(()=>w.print(),1200);
 }
 
 /* ── AUDIT ── */
