@@ -14,7 +14,10 @@
       "Bash(ls /Users/romandemac/Desktop/*.xlsx /Users/romandemac/Desktop/*.csv /Users/romandemac/Desktop/*.json /Users/romandemac/Desktop/*.sql)",
       "Read(//Users/romandemac/Desktop/**)",
       "Bash(1:*)",
-      "Bash(open \"https://supabase.com/dashboard/project/mdgfcgxtlxgzkvoiqonp/auth/users\")"
+      "Bash(open \"https://supabase.com/dashboard/project/mdgfcgxtlxgzkvoiqonp/auth/users\")",
+      "Bash(awk 'NR>=2190 && NR<=2360' live-cue-admin.html)",
+      "Bash(awk 'NR>=2152 && NR<=2200' live-cue-admin.html)",
+      "Bash(awk 'NR>=1939 && NR<=2000' live-cue-admin.html)"
     ]
   }
 }
