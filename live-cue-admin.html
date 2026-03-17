@@ -2227,66 +2227,63 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
         seqNum++;
         const isFirst=(li===0);
         const bg=(seqNum%2===0)?'#f5f7fa':'#ffffff';
-        // Event blocks
+        // ── Merge consecutive events for transmission table ──
+        const team=TEAM_KW.some(k=>(venue.name||'').includes(k));
+        const cueMin=team?-10:-5;
+        const GAP_MS=15*60000;
+        let sessions=[];
+        if(isT){
+          const sorted=lane.evts.slice().sort((a,b)=>a.start_time-b.start_time);
+          sorted.forEach(ev=>{
+            if(!sessions.length||ev.start_time-sessions[sessions.length-1].end>GAP_MS){
+              sessions.push({start:ev.start_time,end:ev.end_time,evts:[ev],hasMedal:!!ev.is_medal_event});
+            } else {
+              const s=sessions[sessions.length-1];
+              s.end=Math.max(s.end,ev.end_time);
+              s.evts.push(ev);
+              if(ev.is_medal_event) s.hasMedal=true;
+            }
+          });
+        } else {
+          sessions=lane.evts.map(ev=>({start:ev.start_time,end:ev.end_time,evts:[ev],hasMedal:!!ev.is_medal_event}));
+        }
+        // Event blocks (one block per session)
         let blocks='';
-        lane.evts.forEach(ev=>{
-          const x=Math.max(0,(ev.start_time-dayMs-startMin*60000)/msPerPx);
-          const w=Math.max(6,(ev.end_time-ev.start_time)/msPerPx);
-          const stStr=`${p2(new Date(ev.start_time).getHours())}:${p2(new Date(ev.start_time).getMinutes())}`;
-          const enStr=`${p2(new Date(ev.end_time).getHours())}:${p2(new Date(ev.end_time).getMinutes())}`;
+        sessions.forEach(sess=>{
+          const x=Math.max(0,(sess.start-dayMs-startMin*60000)/msPerPx);
+          const w=Math.max(6,(sess.end-sess.start)/msPerPx);
+          const stStr=`${p2(new Date(sess.start).getHours())}:${p2(new Date(sess.start).getMinutes())}`;
+          const enStr=`${p2(new Date(sess.end).getHours())}:${p2(new Date(sess.end).getMinutes())}`;
           if(isT){
-            const team=TEAM_KW.some(k=>(venue.name||'').includes(k));
-            const cueMin=team?-10:-5;
-            const cueMs=ev.start_time+cueMin*60000;
+            const cueMs=sess.start+cueMin*60000;
             const cueX=x+(cueMin*60000)/msPerPx;
             const cueStr=`${p2(new Date(cueMs).getHours())}:${p2(new Date(cueMs).getMinutes())}`;
-            blocks+=`<div style="position:absolute;left:${cueX}px;top:0;bottom:0;width:2px;background:#dc2626;z-index:3;pointer-events:none">
-              <span style="position:absolute;top:1px;left:3px;font-size:7px;font-weight:bold;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.4">${cueStr}</span>
-            </div>`;
+            blocks+=`<div style="position:absolute;left:${cueX}px;top:0;bottom:0;width:2px;background:#dc2626;z-index:3;pointer-events:none"><span style="position:absolute;top:1px;left:3px;font-size:7px;font-weight:bold;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.4">${cueStr}</span></div>`;
           }
-          const blkColor=isT?(ev.is_medal_event?'#e07b1a':'#3a8c4e'):(venue.color);
-          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:2px;bottom:2px;background:${blkColor};overflow:hidden;z-index:1;padding:2px 4px;box-sizing:border-box"><div style="font-size:7px;font-weight:bold;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:2.6em">${ev.name}</div><div style="font-size:6.5px;color:#fff;line-height:1.2">${stStr}</div></div>`;
+          const blkColor=isT?(sess.hasMedal?'#e07b1a':'#3a8c4e'):venue.color;
+          const label=sess.evts.length===1?sess.evts[0].name:`${sess.evts[0].name} 等${sess.evts.length}场`;
+          const timeRange=sess.evts.length>1?`${stStr}–${enStr}`:stStr;
+          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:2px;bottom:2px;background:${blkColor};overflow:hidden;z-index:1;padding:2px 4px;box-sizing:border-box"><div style="font-size:7px;font-weight:bold;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:2.6em">${label}</div><div style="font-size:6.5px;color:#fff;line-height:1.2">${timeRange}</div></div>`;
         });
-        // Venue cell
-        const vContent=isFirst
-          ?`<div style="font-size:9.5px;font-weight:700;color:#0f172a;word-break:break-all;line-height:1.3">${venue.short_name||venue.name}</div>${lane.label?`<div style="font-size:8px;color:${venue.color};font-weight:600;margin-top:2px">${lane.label}</div>`:''}`
-          :`<div style="font-size:8.5px;color:${venue.color};font-weight:600;padding-left:8px;word-break:break-all">${lane.label||venue.short_name||venue.name}</div>`;
-        // Sport/round cell
+        // Sport/round cell — per session summaries for transmission
         let spContent;
-        if(lane.evts.length===1){
-          const ev=lane.evts[0];
-          const evSt=new Date(ev.start_time);
-          const evStStr=`${p2(evSt.getHours())}:${p2(evSt.getMinutes())}`;
-          if(isT){
-            const team=TEAM_KW.some(k=>(venue.name||'').includes(k));
-            const cueMin=team?-10:-5;
-            const cueMs=ev.start_time+cueMin*60000;
-            const cueD=new Date(cueMs);
-            const cueStr=`${p2(cueD.getHours())}:${p2(cueD.getMinutes())}`;
-            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>
-              <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap">
-                <span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:3px;white-space:nowrap">传送 ${cueStr}</span>
-                <span style="font-size:7.5px;color:#64748b;white-space:nowrap">开始 ${evStStr}（提前${Math.abs(cueMin)}分钟）</span>
-                ${ev.round?`<span style="font-size:7.5px;color:#94a3b8">${ev.round}</span>`:''}
-              </div>`;
-          } else {
+        if(!isT){
+          if(lane.evts.length===1){
+            const ev=lane.evts[0];
             spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>${ev.round?`<div style="font-size:7.5px;color:#64748b;margin-top:2px">${ev.round}</div>`:''}`;
-          }
-        } else {
-          if(isT){
-            const firstEv=lane.evts[0];
-            const team=TEAM_KW.some(k=>(venue.name||'').includes(k));
-            const cueMin=team?-10:-5;
-            const cueMs=firstEv.start_time+cueMin*60000;
-            const cueD=new Date(cueMs);
-            const cueStr=`${p2(cueD.getHours())}:${p2(cueD.getMinutes())}`;
-            spContent=`<div style="font-size:8.5px;color:#475569">共 <strong style="color:#0f172a">${lane.evts.length}</strong> 场赛事</div>
-              <div style="margin-top:2px"><span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:3px">首场传送 ${cueStr}（提前${Math.abs(cueMin)}分钟）</span></div>`;
           } else {
             spContent=`<div style="font-size:8.5px;color:#475569">共 <strong style="color:#0f172a">${lane.evts.length}</strong> 场赛事</div>${lane.label?`<div style="font-size:7.5px;color:#94a3b8;margin-top:2px">${lane.label}</div>`:''}`;
           }
+        } else {
+          spContent=sessions.map((sess,si)=>{
+            const cueMs=sess.start+cueMin*60000;
+            const cueStr=`${p2(new Date(cueMs).getHours())}:${p2(new Date(cueMs).getMinutes())}`;
+            const stStr2=`${p2(new Date(sess.start).getHours())}:${p2(new Date(sess.start).getMinutes())}`;
+            const sessLabel=sess.evts.length===1?sess.evts[0].name:`${sess.evts[0].name}等${sess.evts.length}场连续赛事`;
+            return `<div style="font-size:8px;font-weight:600;color:#1e293b;line-height:1.3;word-break:break-all${si>0?';margin-top:4px;padding-top:3px;border-top:1px dashed #e2e8f0':''}">${sessLabel}</div><div style="display:flex;align-items:center;gap:5px;margin-top:1px;flex-wrap:wrap"><span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px;white-space:nowrap">传送 ${cueStr}</span><span style="font-size:7px;color:#64748b;white-space:nowrap">开始 ${stStr2}（提前${Math.abs(cueMin)}分钟）</span></div>`;
+          }).join('');
         }
-        // Std cell
+                // Std cell
         const stdContent=isT?`<span style="display:inline-block;font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:2px 6px;border-radius:3px;white-space:nowrap">HD 1080</span>`:`<span style="color:#94a3b8;font-size:9px">—</span>`;
         rowsHtml+=`<tr style="min-height:${rowH}px;background:${bg}">
           <td style="width:${seqW}px;text-align:center;font-size:9.5px;font-weight:600;color:#64748b;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${seqNum}</td>
