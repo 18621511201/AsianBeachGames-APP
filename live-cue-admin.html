@@ -2319,14 +2319,21 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
           const blkColor=isT?(ev.is_medal_event?'#e07b1a':'#3a8c4e'):venue.color;
           blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:2px;bottom:2px;background:${blkColor};overflow:hidden;z-index:1;padding:2px 4px;box-sizing:border-box"><div style="font-size:7px;font-weight:bold;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:2.6em">${ev.name}</div><div style="font-size:6.5px;color:#fff;line-height:1.2">${stStr}</div></div>`;
         });
-        // Sport/round cell — for transmission show cue times for events that need it
+        // Sport/round cell — show time for all events
+        const fmtT=ms=>{const d=new Date(ms);return `${p2(d.getHours())}:${p2(d.getMinutes())}`;};
         let spContent;
         if(!isT){
           if(lane.evts.length===1){
             const ev=lane.evts[0];
-            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>${ev.round?`<div style="font-size:7.5px;color:#64748b;margin-top:2px">${ev.round}</div>`:''}`;
+            const tRange=`${fmtT(ev.start_time)}–${fmtT(ev.end_time)}`;
+            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>
+              <div style="display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap">
+                <span style="font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:1px 5px;border-radius:3px;white-space:nowrap;font-family:monospace">${tRange}</span>
+                ${ev.round?`<span style="font-size:7.5px;color:#64748b">${ev.round}</span>`:''}
+              </div>`;
           } else {
-            spContent=`<div style="font-size:8.5px;color:#475569">共 <strong style="color:#0f172a">${lane.evts.length}</strong> 场赛事</div>${lane.label?`<div style="font-size:7.5px;color:#94a3b8;margin-top:2px">${lane.label}</div>`:''}`;
+            const evList=sortedEvts.map(ev=>`<div style="font-size:7.5px;color:#1e293b;display:flex;align-items:baseline;gap:4px;margin-top:2px"><span style="font-family:monospace;font-weight:700;color:#1d4ed8;white-space:nowrap;flex-shrink:0">${fmtT(ev.start_time)}</span><span style="word-break:break-all;line-height:1.25">${ev.name}</span></div>`).join('');
+            spContent=`<div style="font-size:8px;color:#475569;margin-bottom:1px">共 <strong style="color:#0f172a">${lane.evts.length}</strong> 场赛事</div>${evList}`;
           }
         } else {
           // Show cue time info for events that need a cue marker
@@ -2335,18 +2342,24 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
             // Single event
             const ev=cueEvts[0];
             const cueMs=ev.start_time+cueMin*60000;
-            const cueStr=`${p2(new Date(cueMs).getHours())}:${p2(new Date(cueMs).getMinutes())}`;
-            const stStr2=`${p2(new Date(ev.start_time).getHours())}:${p2(new Date(ev.start_time).getMinutes())}`;
-            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div><div style="display:flex;align-items:center;gap:5px;margin-top:2px;flex-wrap:wrap"><span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px;white-space:nowrap">传送 ${cueStr}</span><span style="font-size:7px;color:#64748b;white-space:nowrap">开始 ${stStr2}（提前${Math.abs(cueMin)}分钟）</span></div>`;
+            const cueStr=fmtT(cueMs);
+            const stStr2=fmtT(ev.start_time);
+            const enStr2=fmtT(ev.end_time);
+            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>
+              <div style="display:flex;align-items:center;gap:4px;margin-top:2px;flex-wrap:wrap">
+                <span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px;white-space:nowrap">传送 ${cueStr}</span>
+                <span style="font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:1px 4px;border-radius:3px;white-space:nowrap;font-family:monospace">${stStr2}–${enStr2}</span>
+              </div>`;
           } else {
             // Multiple events: list only those that need a cue, rest show as count
-            const lines=cueEvts.map((ev,i)=>{
-              const cueMs=ev.start_time+cueMin*60000;
-              const cueStr=`${p2(new Date(cueMs).getHours())}:${p2(new Date(cueMs).getMinutes())}`;
-              const stStr2=`${p2(new Date(ev.start_time).getHours())}:${p2(new Date(ev.start_time).getMinutes())}`;
-              return `<div style="font-size:7.5px;${i>0?'margin-top:3px;padding-top:3px;border-top:1px dashed #e2e8f0':''}"><span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px">传送 ${cueStr}</span> <span style="color:#64748b">开始 ${stStr2}（−${Math.abs(cueMin)}分钟）</span></div>`;
+            // Show all events with time, highlight those needing cue
+            const evLines=sortedEvts.map((ev,ei)=>{
+              const hasCue=needsCue[ei];
+              const tRange=`${fmtT(ev.start_time)}–${fmtT(ev.end_time)}`;
+              const cueTag=hasCue?`<span style="font-size:7.5px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 4px;border-radius:3px;white-space:nowrap">传送 ${fmtT(ev.start_time+cueMin*60000)}</span> `:'';
+              return `<div style="font-size:7.5px;color:#1e293b;display:flex;align-items:baseline;gap:3px;margin-top:2px;flex-wrap:wrap">${cueTag}<span style="font-family:monospace;font-weight:700;color:#1d4ed8;white-space:nowrap">${tRange}</span><span style="word-break:break-all;line-height:1.25">${ev.name}</span></div>`;
             });
-            spContent=`<div style="font-size:8px;color:#475569;margin-bottom:3px">共 <strong style="color:#0f172a">${sortedEvts.length}</strong> 场赛事</div>${lines.join('')}`;
+            spContent=`<div style="font-size:8px;color:#475569;margin-bottom:1px">共 <strong style="color:#0f172a">${sortedEvts.length}</strong> 场赛事</div>${evLines.join('')}`;
           }
         }
                 // Venue cell
