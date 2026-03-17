@@ -409,6 +409,13 @@ const db=createClient(SB_URL,SB_KEY);
 let CUR_USER=null,CUR_ROLE='viewer';
 let VENUES=[],EVENTS=[],LOGS=[];
 
+/* ── VENUE MAP (cached) ── */
+async function loadVenueMap(){
+  if(VENUES.length) return;
+  const {data}=await db.from('venues').select('*').order('name');
+  VENUES=data||[];
+}
+
 /* ── AUTH ── */
 async function checkAuth(){
   const {data:{session}}=await db.auth.getSession();
