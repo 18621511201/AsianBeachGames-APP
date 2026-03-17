@@ -1549,27 +1549,40 @@ ${rawText.slice(0,12000)}
     }
     const data=await resp.json();
     let txt=data.content[0].text.trim();
-    // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
-    txt=txt.replace(/^```(?:json)?\s*/i,'').replace(/\s*```\s*$/,'').trim();
-    // Try to find a JSON array directly
-    let jsonMatch=txt.match(/\[[\s\S]*\]/);
-    // If not found, try JSON object wrapper e.g. {"events":[...]}
-    if(!jsonMatch){
-      const objMatch=txt.match(/\{[\s\S]*\}/);
-      if(objMatch){
-        try{
-          const obj=JSON.parse(objMatch[0]);
-          // Find first array value in the object
-          const arr=Object.values(obj).find(v=>Array.isArray(v));
-          if(arr){_aiParsedEvents=arr;}
-          else throw new Error('对象中未找到数组');
-        }catch(pe){throw new Error('AI 返回内容无法解析为 JSON：'+pe.message);}
-      } else {
-        // Last resort: show first 200 chars of response for debugging
-        throw new Error('AI 返回内容无法解析为 JSON，原始内容：'+txt.slice(0,200));
+    // Strip markdown code fences if present
+    txt=txt.replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'').trim();
+
+    // Extract balanced JSON structure using bracket counter (handles trailing text)
+    function extractBalanced(s, open, close){
+      const start=s.indexOf(open); if(start===-1) return null;
+      let depth=0,inStr=false,esc=false;
+      for(let i=start;i<s.length;i++){
+        const c=s[i];
+        if(esc){esc=false;continue;}
+        if(c==='\\'&&inStr){esc=true;continue;}
+        if(c==='"'){inStr=!inStr;continue;}
+        if(inStr) continue;
+        if(c===open||c==='{') depth++;
+        else if(c===close||c==='}'){depth--;if(depth===0) return s.slice(start,i+1);}
       }
+      return null;
+    }
+
+    // First try to extract a top-level array
+    const arrStr=extractBalanced(txt,'[',']');
+    if(arrStr){
+      _aiParsedEvents=JSON.parse(arrStr);
     } else {
-      _aiParsedEvents=JSON.parse(jsonMatch[0]);
+      // Try object wrapper e.g. {"events":[...]}
+      const objStr=extractBalanced(txt,'{','}');
+      if(objStr){
+        const obj=JSON.parse(objStr);
+        const arr=Object.values(obj).find(v=>Array.isArray(v));
+        if(arr) _aiParsedEvents=arr;
+        else throw new Error('AI 返回对象中未找到数组');
+      } else {
+        throw new Error('AI 返回内容无法解析为 JSON，原始：'+txt.slice(0,300));
+      }
     }
     document.getElementById('fileStatus').innerHTML=`<span style="color:var(--ok)">✓ AI 解析完成，发现 ${_aiParsedEvents.length} 条赛事</span>`;
     renderAiResult(_aiParsedEvents, fileName);
