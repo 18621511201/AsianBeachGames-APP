@@ -889,8 +889,16 @@ let _venueQ='';
 async function renderVenues(){
   document.getElementById('pageActions').innerHTML=`<button class="btn btn-primary" onclick="openVenueModal(null)">＋ 添加场馆</button>`;
   document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
-  const {data}=await db.from('venues').select('*').order('name');
-  VENUES=data||[];
+  const [{data:vd},{data:ed}]=await Promise.all([
+    db.from('venues').select('*').order('name'),
+    db.from('events').select('id,venue_id,start_time,end_time,notes').order('start_time')
+  ]);
+  VENUES=vd||[];
+  window._venueEvtsMap={};
+  (ed||[]).forEach(e=>{
+    if(!window._venueEvtsMap[e.venue_id]) window._venueEvtsMap[e.venue_id]=[];
+    window._venueEvtsMap[e.venue_id].push(e);
+  });
   _venueQ='';
   document.getElementById('pageSub').textContent=`共 ${VENUES.length} 个场馆`;
   renderVenueTable();
@@ -929,20 +937,33 @@ function renderVenueTable(){
           <td>${(()=>{
             const {loc,courts}=parseVenueLocJson(v.location||'');
             const locStr=loc||'—';
-            if(!courts.length) return locStr;
-            const tags=courts.map(c=>{
-              const on=c.on!==false;
-              return `<span onclick="toggleCourt('${v.id}','${c.n.replace(/'/g,"\\'")}');event.stopPropagation()"
-                style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:10px;
-                  padding:1px 7px 1px 5px;border-radius:10px;margin:1px 2px;user-select:none;
-                  background:${on?'rgba(207,107,60,.18)':'rgba(255,255,255,.06)'};
-                  border:1px solid ${on?'var(--acc)':'var(--t3)'};
-                  color:${on?'var(--acc)':'var(--t3)'};"
-                title="${c.n} — 点击${on?'关闭':'开启'}前台及导出显示">
-                <span style="font-size:9px">${on?'●':'○'}</span>${c.n}
-              </span>`;
-            }).join('');
-            return `<div style="font-size:11px;color:var(--t2);margin-bottom:2px">${locStr}</div><div style="display:flex;flex-wrap:wrap;gap:1px">${tags}</div>`;
+            if(courts.length){
+              const tags=courts.map(c=>{
+                const on=c.on!==false;
+                return `<span onclick="toggleCourt('${v.id}','${c.n.replace(/'/g,"\'")}');event.stopPropagation()"
+                  style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:10px;
+                    padding:1px 7px 1px 5px;border-radius:10px;margin:1px 2px;user-select:none;
+                    background:${on?'rgba(207,107,60,.18)':'rgba(255,255,255,.06)'};
+                    border:1px solid ${on?'var(--acc)':'var(--t3)'};
+                    color:${on?'var(--acc)':'var(--t3)'};"
+                  title="${c.n} — 点击${on?'关闭':'开启'}前台及导出显示">
+                  <span style="font-size:9px">${on?'●':'○'}</span>${c.n}
+                </span>`;
+              }).join('');
+              return `<div style="font-size:11px;color:var(--t2);margin-bottom:2px">${locStr}</div><div style="display:flex;flex-wrap:wrap;gap:1px">${tags}</div>`;
+            }
+            const vEvts=(window._venueEvtsMap||{})[v.id]||[];
+            if(vEvts.length>1){
+              const sorted=vEvts.slice().sort((a,b)=>a.start_time-b.start_time);
+              const ends=[sorted[0].end_time];let lanes=1;
+              for(let i=1;i<sorted.length;i++){
+                const ev=sorted[i];let placed=false;
+                for(let j=0;j<ends.length;j++){if(ev.start_time>=ends[j]){ends[j]=ev.end_time;placed=true;break;}}
+                if(!placed){ends.push(ev.end_time);lanes++;}
+              }
+              if(lanes>1) return `<div style="font-size:11px;color:var(--t2);margin-bottom:3px">${locStr}</div><div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span style="font-size:10px;color:var(--up)">⚡ 检测到 ${lanes} 个场地</span><button class="btn btn-ghost btn-sm" style="padding:1px 8px;font-size:9px" onclick="autoSaveCourts('${v.id}',${lanes});event.stopPropagation()">保存子场地</button></div>`;
+            }
+            return locStr;
           })()} </td>
           <td><div style="display:flex;align-items:center;gap:6px"><div style="width:14px;height:14px;border-radius:3px;background:${v.color||'#888'}"></div><span style="font-size:11px;color:var(--t3)">${v.color||'—'}</span></div></td>
           <td><span class="badge ${v.is_active?'sched':'done'}">${v.is_active?'启用':'停用'}</span></td>
@@ -1033,6 +1054,18 @@ async function saveVenue(){
 
 /* ── SCHEDULE VIEW ── */
 let _schedVenueFilter=null;
+async function autoSaveCourts(venueId, count){
+  const venue=VENUES.find(v=>v.id===venueId);
+  if(!venue) return;
+  const {loc}=parseVenueLocJson(venue.location||'');
+  const courts=Array.from({length:count},(_,i)=>({n:`场地${i+1}`,on:true}));
+  const newLoc=JSON.stringify({loc:loc||'',courts});
+  const {error}=await db.from('venues').update({location:newLoc}).eq('id',venueId);
+  if(error){alert('保存失败: '+error.message);return;}
+  venue.location=newLoc;
+  renderVenueTable();
+}
+
 async function toggleCourt(venueId, courtName){
   const venue=VENUES.find(v=>v.id===venueId);
   if(!venue) return;
