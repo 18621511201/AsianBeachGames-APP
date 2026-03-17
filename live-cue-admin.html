@@ -1873,7 +1873,6 @@ async function renderAiResult(parsedEvents, fileName){
     + (badEvts.length ? collapsibleSection('bad','⚠️ 无法导入（场馆未匹配）',badEvts.length,'color:#ef4444',diffTable(badEvts,'bad'),false) : '');
 
   // Show result section
-  const sec=document.getElementById('aiResultSection');
   sec.style.display='';
   sec.scrollIntoView({behavior:'smooth',block:'start'});
 
