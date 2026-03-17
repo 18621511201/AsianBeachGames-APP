@@ -2236,7 +2236,18 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
     const dateStr=`${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`;
     const minMs=Math.min(...evts.map(e=>e.start_time));
     const maxMs=Math.max(...evts.map(e=>e.end_time));
-    const startMin=Math.floor((minMs-dayMs)/60000/60)*60;
+    // For transmission: pull axis start back to cover earliest cue time + 30min buffer
+    let startMin=Math.floor((minMs-dayMs)/60000/60)*60;
+    if(isT){
+      const earliestCueMs=Math.min(...evts.map(e=>{
+        const vn=(VENUES.find(v=>v.id===e.venue_id)?.name)||'';
+        const isTeamEv=TEAM_KW.some(k=>vn.includes(k));
+        return e.start_time+(isTeamEv?-10:-5)*60000;
+      }));
+      const earliestCueMin=Math.floor((earliestCueMs-dayMs)/60000);
+      // Start 30 min before earliest cue, snapped to 30-min grid
+      startMin=Math.min(startMin, Math.floor((earliestCueMin-30)/30)*30);
+    }
     const endMin=Math.ceil((maxMs-dayMs)/60000/60)*60+60;
     const totalMin=endMin-startMin;
     const totalPx=totalMin/60*pxPerHr;
@@ -2303,21 +2314,34 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
           const prevEnd=sortedEvts[ei-1].end_time;
           return (ev.start_time-prevEnd)>GAP_THRESHOLD;
         });
-        // Event blocks
+        // Event blocks — detect overlapping events within lane → stack into sub-rows
+        // Assign each event a sub-lane index (0=top, 1=bottom, etc.)
+        const subLanes=[]; // array of end_time for each sub-lane
+        const subLaneIdx=sortedEvts.map(ev=>{
+          for(let i=0;i<subLanes.length;i++){
+            if(ev.start_time>=subLanes[i]){subLanes[i]=ev.end_time;return i;}
+          }
+          subLanes.push(ev.end_time);return subLanes.length-1;
+        });
+        const numSubLanes=Math.max(1,subLanes.length);
+        const subH=Math.max(16,Math.floor((rowH-4)/numSubLanes));
         let blocks='';
         sortedEvts.forEach((ev,ei)=>{
           const x=Math.max(0,(ev.start_time-dayMs-startMin*60000)/msPerPx);
           const w=Math.max(6,(ev.end_time-ev.start_time)/msPerPx);
           const stStr=`${p2(new Date(ev.start_time).getHours())}:${p2(new Date(ev.start_time).getMinutes())}`;
-          const enStr=`${p2(new Date(ev.end_time).getHours())}:${p2(new Date(ev.end_time).getMinutes())}`;
+          const si=subLaneIdx[ei];
+          const top=2+si*subH;
+          const blockH=subH-2;
           if(needsCue[ei]){
             const cueMs=ev.start_time+cueMin*60000;
             const cueX=x+(cueMin*60000)/msPerPx;
             const cueStr=`${p2(new Date(cueMs).getHours())}:${p2(new Date(cueMs).getMinutes())}`;
-            blocks+=`<div style="position:absolute;left:${cueX}px;top:0;bottom:0;width:2px;background:#dc2626;z-index:3;pointer-events:none"><span style="position:absolute;top:1px;left:3px;font-size:7px;font-weight:bold;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.4">${cueStr}</span></div>`;
+            // cue line spans full row height; label positioned at this sub-lane
+            blocks+=`<div style="position:absolute;left:${cueX}px;top:0;bottom:0;width:2px;background:#dc2626;z-index:3;pointer-events:none"><span style="position:absolute;top:${top}px;left:3px;font-size:7px;font-weight:bold;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.4">${cueStr}</span></div>`;
           }
           const blkColor=isT?(ev.is_medal_event?'#e07b1a':'#3a8c4e'):venue.color;
-          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:2px;bottom:2px;background:${blkColor};overflow:hidden;z-index:1;padding:2px 4px;box-sizing:border-box"><div style="font-size:7px;font-weight:bold;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:2.6em">${ev.name}</div><div style="font-size:6.5px;color:#fff;line-height:1.2">${stStr}</div></div>`;
+          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:${top}px;height:${blockH}px;background:${blkColor};overflow:hidden;z-index:${2+si};padding:1px 4px;box-sizing:border-box;border-radius:2px"><div style="font-size:${numSubLanes>1?6.5:7}px;font-weight:bold;color:#fff;line-height:1.2;word-break:break-all;overflow:hidden;max-height:${blockH<=16?'1.3em':'2.5em'}">${ev.name}</div>${blockH>14?`<div style="font-size:6px;color:rgba(255,255,255,.9);line-height:1.1">${stStr}</div>`:''}</div>`;
         });
         // Sport/round cell — show time for all events
         const fmtT=ms=>{const d=new Date(ms);return `${p2(d.getHours())}:${p2(d.getMinutes())}`;};
@@ -2368,12 +2392,13 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
           :`<div style="font-size:8.5px;color:${venue.color};font-weight:600;padding-left:8px;word-break:break-all">${lane.label||venue.short_name||venue.name}</div>`;
         // Std cell
         const stdContent=isT?`<span style="display:inline-block;font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:2px 6px;border-radius:3px;white-space:nowrap">HD 1080</span>`:`<span style="color:#94a3b8;font-size:9px">—</span>`;
-        rowsHtml+=`<tr style="min-height:${rowH}px;background:${bg}">
+        const dynH=Math.max(rowH,numSubLanes*(rowH*0.6+2)+4);
+        rowsHtml+=`<tr style="min-height:${dynH}px;background:${bg}">
           <td style="width:${seqW}px;text-align:center;font-size:9.5px;font-weight:600;color:#64748b;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${seqNum}</td>
           <td style="width:${venueW}px;padding:3px 8px;vertical-align:middle;border-left:3px solid ${venue.color};border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${vContent}</td>
           <td style="width:${sportW}px;padding:3px 8px;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${spContent}</td>
           <td style="width:${stdW}px;text-align:center;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${stdContent}</td>
-          <td style="position:relative;overflow:hidden;border-bottom:1px solid #dde3ea;height:${rowH}px;min-height:${rowH}px">${gTicks}${blocks}</td>
+          <td style="position:relative;overflow:hidden;border-bottom:1px solid #dde3ea;height:${dynH}px;min-height:${dynH}px">${gTicks}${blocks}</td>
         </tr>`;
       });
     });
