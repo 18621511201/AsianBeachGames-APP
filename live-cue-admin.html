@@ -2268,21 +2268,10 @@ function adminGetLanes(venue, vEvts){
   if(!vEvts.length) return [];
   const {courts:defined}=parseVenueLocJson(venue.location||'');
   const active=defined.filter(c=>c.on!==false);
-  const inactive=defined.filter(c=>c.on===false);
-  const inactiveNames=new Set(inactive.map(c=>c.n));
-  // ① Venue has defined sub-courts
+  // ① Venue has defined sub-courts — only show events tagged to active courts
   if(defined.length>0){
     if(active.length===0) return []; // all courts off → hide venue entirely
-    // Filter out events tagged to inactive courts
-    const visEvts=vEvts.filter(e=>{
-      const ct=parseCourtNotes(e.notes).court;
-      return !ct||!inactiveNames.has(ct);
-    });
-    if(!visEvts.length) return [];
-    const lanes=active.map(c=>({label:c.n,evts:visEvts.filter(e=>parseCourtNotes(e.notes).court===c.n)}));
-    const tagged=new Set(visEvts.filter(e=>parseCourtNotes(e.notes).court).map(e=>e.id));
-    const untagged=visEvts.filter(e=>!tagged.has(e.id));
-    if(untagged.length) lanes.push({label:'其他',evts:untagged});
+    const lanes=active.map(c=>({label:c.n,evts:vEvts.filter(e=>parseCourtNotes(e.notes).court===c.n)}));
     return lanes.filter(ln=>ln.evts.length>0);
   }
   // ② No courts defined → auto collision detect
