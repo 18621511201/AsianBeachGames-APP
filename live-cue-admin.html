@@ -2244,12 +2244,12 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
               <span style="position:absolute;top:1px;left:3px;font-size:7px;font-weight:bold;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.4">${cueStr}</span>
             </div>`;
           }
-          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:3px;bottom:3px;background:${venue.color};overflow:hidden;z-index:1;display:flex;align-items:center;padding:0 5px;gap:3px"><span style="font-size:8px;font-weight:bold;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1">${ev.name}</span><span style="font-size:7.5px;color:#fff;flex-shrink:0;white-space:nowrap">${stStr}</span></div>`;
+          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:2px;bottom:2px;background:${venue.color};overflow:hidden;z-index:1;padding:2px 4px;box-sizing:border-box"><div style="font-size:7px;font-weight:bold;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:2.6em">${ev.name}</div><div style="font-size:6.5px;color:#fff;line-height:1.2">${stStr}</div></div>`;
         });
         // Venue cell
         const vContent=isFirst
-          ?`<div style="font-size:10px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${venue.short_name||venue.name}</div>${lane.label?`<div style="font-size:8px;color:${venue.color};font-weight:600;margin-top:2px">${lane.label}</div>`:''}`
-          :`<div style="font-size:8.5px;color:${venue.color};font-weight:600;padding-left:8px">${lane.label||venue.short_name||venue.name}</div>`;
+          ?`<div style="font-size:9.5px;font-weight:700;color:#0f172a;word-break:break-all;line-height:1.3">${venue.short_name||venue.name}</div>${lane.label?`<div style="font-size:8px;color:${venue.color};font-weight:600;margin-top:2px">${lane.label}</div>`:''}`
+          :`<div style="font-size:8.5px;color:${venue.color};font-weight:600;padding-left:8px;word-break:break-all">${lane.label||venue.short_name||venue.name}</div>`;
         // Sport/round cell
         let spContent;
         if(lane.evts.length===1){
@@ -2262,14 +2262,14 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
             const cueMs=ev.start_time+cueMin*60000;
             const cueD=new Date(cueMs);
             const cueStr=`${p2(cueD.getHours())}:${p2(cueD.getMinutes())}`;
-            spContent=`<div style="font-size:9px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev.name}</div>
+            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>
               <div style="display:flex;align-items:center;gap:6px;margin-top:2px;flex-wrap:wrap">
                 <span style="font-size:8px;font-weight:700;color:#dc2626;background:#fee2e2;padding:1px 5px;border-radius:3px;white-space:nowrap">传送 ${cueStr}</span>
                 <span style="font-size:7.5px;color:#64748b;white-space:nowrap">开始 ${evStStr}（提前${Math.abs(cueMin)}分钟）</span>
                 ${ev.round?`<span style="font-size:7.5px;color:#94a3b8">${ev.round}</span>`:''}
               </div>`;
           } else {
-            spContent=`<div style="font-size:9px;font-weight:600;color:#1e293b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ev.name}</div>${ev.round?`<div style="font-size:7.5px;color:#64748b;margin-top:2px">${ev.round}</div>`:''}`;
+            spContent=`<div style="font-size:8.5px;font-weight:600;color:#1e293b;line-height:1.35;word-break:break-all">${ev.name}</div>${ev.round?`<div style="font-size:7.5px;color:#64748b;margin-top:2px">${ev.round}</div>`:''}`;
           }
         } else {
           if(isT){
@@ -2287,12 +2287,12 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
         }
         // Std cell
         const stdContent=isT?`<span style="display:inline-block;font-size:8px;font-weight:700;color:#1d4ed8;background:#dbeafe;padding:2px 6px;border-radius:3px;white-space:nowrap">HD 1080</span>`:`<span style="color:#94a3b8;font-size:9px">—</span>`;
-        rowsHtml+=`<tr style="height:${rowH}px;background:${bg}">
+        rowsHtml+=`<tr style="min-height:${rowH}px;background:${bg}">
           <td style="width:${seqW}px;text-align:center;font-size:9.5px;font-weight:600;color:#64748b;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${seqNum}</td>
           <td style="width:${venueW}px;padding:3px 8px;vertical-align:middle;border-left:3px solid ${venue.color};border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${vContent}</td>
           <td style="width:${sportW}px;padding:3px 8px;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${spContent}</td>
           <td style="width:${stdW}px;text-align:center;vertical-align:middle;border-right:1px solid #dde3ea;border-bottom:1px solid #dde3ea">${stdContent}</td>
-          <td style="position:relative;overflow:hidden;border-bottom:1px solid #dde3ea;height:${rowH}px">${gTicks}${blocks}</td>
+          <td style="position:relative;overflow:hidden;border-bottom:1px solid #dde3ea;height:${rowH}px;min-height:${rowH}px">${gTicks}${blocks}</td>
         </tr>`;
       });
     });
