@@ -826,22 +826,30 @@ function getVenueLanes(venueId){
   const venue=VENUES.find(v=>v.id===venueId);
   const {courts:definedCourts}=parseVenueLocJson(venue?.location||'');
   const activeCourts=definedCourts.filter(c=>c.on!==false);
+  const inactiveCourts=definedCourts.filter(c=>c.on===false);
+  const inactiveNames=new Set(inactiveCourts.map(c=>c.n));
   const evts=allEvts.filter(e=>e.venue_id===venueId);
   if(!evts.length) return [{label:'',evts:[]}];
 
-  // ① Venue has defined sub-courts → show each active court as a lane
-  if(activeCourts.length>0){
+  // ① Venue has defined sub-courts
+  if(definedCourts.length>0){
+    // If ALL courts are off → show nothing for this venue
+    if(activeCourts.length===0) return [];
+    // Filter out events tagged to inactive courts
+    const visibleEvts=evts.filter(e=>{
+      const ct=parseCourt(e.notes);
+      return !ct||!inactiveNames.has(ct);
+    });
     const lanes=activeCourts.map(c=>({
       label:c.n,
-      evts:evts.filter(e=>parseCourt(e.notes)===c.n)
+      evts:visibleEvts.filter(e=>parseCourt(e.notes)===c.n)
     }));
-    // Catch-all for events not tagged to any court
-    const taggedIds=new Set(evts.filter(e=>parseCourt(e.notes)).map(e=>e.id));
-    const untagged=evts.filter(e=>!taggedIds.has(e.id));
+    // Catch-all: untagged events not belonging to any defined court
+    const taggedIds=new Set(visibleEvts.filter(e=>parseCourt(e.notes)).map(e=>e.id));
+    const untagged=visibleEvts.filter(e=>!taggedIds.has(e.id));
     if(untagged.length) lanes.push({label:isZh?'其他场地':'Other',evts:untagged});
-    // Only return lanes that have events
     const nonempty=lanes.filter(ln=>ln.evts.length>0);
-    return nonempty.length>0?nonempty:[{label:'',evts}];
+    return nonempty.length>0?nonempty:[{label:'',evts:visibleEvts}];
   }
 
   // ② Events have explicit court tags in notes
