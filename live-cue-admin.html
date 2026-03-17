@@ -2244,7 +2244,8 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
               <span style="position:absolute;top:1px;left:3px;font-size:7px;font-weight:bold;color:#dc2626;white-space:nowrap;background:#fff;padding:0 2px;border-radius:2px;line-height:1.4">${cueStr}</span>
             </div>`;
           }
-          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:2px;bottom:2px;background:${venue.color};overflow:hidden;z-index:1;padding:2px 4px;box-sizing:border-box"><div style="font-size:7px;font-weight:bold;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:2.6em">${ev.name}</div><div style="font-size:6.5px;color:#fff;line-height:1.2">${stStr}</div></div>`;
+          const blkColor=isT?(ev.is_medal_event?'#e07b1a':'#3a8c4e'):(venue.color);
+          blocks+=`<div style="position:absolute;left:${x}px;width:${w}px;top:2px;bottom:2px;background:${blkColor};overflow:hidden;z-index:1;padding:2px 4px;box-sizing:border-box"><div style="font-size:7px;font-weight:bold;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:2.6em">${ev.name}</div><div style="font-size:6.5px;color:#fff;line-height:1.2">${stStr}</div></div>`;
         });
         // Venue cell
         const vContent=isFirst
@@ -2300,8 +2301,8 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
     const legendHtml=`<tr style="background:#f1f5f9;border-top:2px solid #94a3b8">
       <td colspan="5" style="padding:5px 14px">
         <div style="display:flex;align-items:center;gap:18px;font-size:8px;color:#475569;flex-wrap:wrap">
-          <div style="display:flex;align-items:center;gap:5px"><div style="width:18px;height:10px;background:#3b82f6;border-radius:2px"></div>普通赛事</div>
-          <div style="display:flex;align-items:center;gap:5px"><div style="width:18px;height:10px;background:#f59e0b;border-radius:2px"></div>含颁奖 &#127941;</div>
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:18px;height:10px;background:${isT?'#3a8c4e':'#3b82f6'};border-radius:2px"></div>${isT?'普通竞赛（青草绿）':'普通赛事'}</div>
+          <div style="display:flex;align-items:center;gap:5px"><div style="width:18px;height:10px;background:${isT?'#e07b1a':'#f59e0b'};border-radius:2px"></div>${isT?'金牌产生（橙色）':'含颁奖 &#127941;'}</div>
           ${isT?`<div style="display:flex;align-items:center;gap:5px"><div style="width:2px;height:14px;background:#dc2626"></div>红线 = 传送提示时间</div>`:''}
           <div style="margin-left:auto;color:#94a3b8;font-size:7.5px">注：时间以${isT?'传送提示时间（比赛前提前量）':'赛事开始时间'}为准 · Live-CUE 赛程管理系统 · 第六届亚洲沙滩运动会 三亚 2026</div>
         </div>
