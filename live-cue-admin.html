@@ -1507,25 +1507,49 @@ async function analyzeWithClaude(rawText, fileName){
   await loadVenueMap();
   const venueList=VENUES.map(v=>`${v.id}|${v.short_name||v.name}`).join('\n');
 
-  const prompt=`你是一个体育赛程数据提取专家。从以下文件内容中提取所有比赛单元日程。
+  const prompt=`你是第六届亚洲沙滩运动会（2026年4月三亚）赛程数据提取专家。从以下文件内容中提取所有比赛单元。
 
-当前可用场馆（id|名称）：
+【比赛日期对照表】
+DAY -1 = 2026-04-21（开幕式前一天）
+DAY 0  = 2026-04-22（开幕式当天）
+DAY 1  = 2026-04-23
+DAY 2  = 2026-04-24
+DAY 3  = 2026-04-25
+DAY 4  = 2026-04-26
+DAY 5  = 2026-04-27
+DAY 6  = 2026-04-28
+DAY 7  = 2026-04-29
+DAY 8  = 2026-04-30（闭幕式）
+
+【常见表格格式说明】
+格式一（矩阵型）：行=场馆+项目，列=每个比赛日，单元格内容示例：
+  "9:30 女子 2-3" → 时间9:30，女子，第2-3名争夺赛
+  "10:15 男子 1-4" → 时间10:15，男子，第1-4名争夺赛
+  "14:00-16:00 混合团体决赛" → 14:00开始，16:00结束，混合团体决赛
+  多行文字=该日多场比赛，每行一场
+格式二（列表型）：直接列出日期、时间、场馆、项目、赛次
+格式三（其他自由格式）：根据上下文理解
+
+【金牌赛事判断】含"决赛"且是最终名次争夺（1-2名/金银牌）时 is_medal_event=true；小组赛、预赛、半决赛、3-4名均为false
+
+【当前可用场馆（id|名称）】
 ${venueList}
 
-文件内容：
-${rawText.slice(0,12000)}
+【文件内容】
+${rawText.slice(0,15000)}
 
-请提取所有比赛单元，返回严格的 JSON 数组，每条记录包含：
-{
-  "name": "赛事名称（中英文）",
-  "venue_id": "从上方场馆列表中匹配最合适的venue_id，如无法匹配填null",
-  "round": "赛次（如：半决赛/决赛/小组赛等）",
-  "start_time": "开始时间，格式2026-MM-DDTHH:mm:ss+08:00",
-  "end_time": "结束时间，格式2026-MM-DDTHH:mm:ss+08:00（如无则start+1小时）",
-  "is_medal_event": true/false
-}
-
-只返回 JSON 数组，不要其他文字。如果无法解析出任何赛事，返回空数组 []。`;
+【输出要求】
+仅返回JSON数组，不加任何说明文字，格式如下：
+[
+  {
+    "name": "项目名称+性别+赛次，如：沙滩排球 女子 决赛",
+    "venue_id": "匹配上方场馆列表中最合适的id，无法匹配填null",
+    "round": "赛次，如：预赛/半决赛/决赛/小组赛/3-4名/5-8名",
+    "start_time": "2026-MM-DDTHH:mm:00+08:00",
+    "end_time": "2026-MM-DDTHH:mm:00+08:00（无结束时间则开始+90分钟）",
+    "is_medal_event": true或false
+  }
+]`;
 
   try{
     const resp=await fetch('https://api.anthropic.com/v1/messages',{
@@ -1538,7 +1562,7 @@ ${rawText.slice(0,12000)}
       },
       body:JSON.stringify({
         model:model,
-        max_tokens:4096,
+        max_tokens:8192,
         messages:[{role:'user',content:prompt}]
       })
     });
