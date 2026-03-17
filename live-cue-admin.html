@@ -583,6 +583,7 @@ async function dashSearch(){
 async function dashDelEvt(id){
   const {error}=await db.from('events').delete().eq('id',id);
   if(error){alert('删除失败: '+error.message);return;}
+  window._venueEvtsMap=null;
   await logAction('delete','events',id);
   await dashSearch();
 }
@@ -714,6 +715,7 @@ async function bulkDelEvts(){
   if(!confirm(`确定永久删除选中的 ${ids.length} 条赛程？此操作不可恢复。`))return;
   const {error}=await db.from('events').delete().in('id',ids);
   if(error){alert('删除失败: '+error.message);return;}
+  window._venueEvtsMap=null;
   await logAction('delete','events',`批量删除 ${ids.length} 条赛程`);
   await renderEvents();
 }
@@ -723,6 +725,7 @@ async function bulkStatusEvts(){
   if(!ids.length||!ns){alert('请先选择目标状态');return;}
   const {error}=await db.from('events').update({status:ns}).in('id',ids);
   if(error){alert('更新失败: '+error.message);return;}
+  window._venueEvtsMap=null;
   await logAction('update','events',`批量改状态→${ns}，共 ${ids.length} 条`);
   await renderEvents();
 }
@@ -867,6 +870,7 @@ async function saveEvent(){
   if(id){({error:err}=await db.from('events').update(payload).eq('id',id));}
   else {({error:err}=await db.from('events').insert(payload));}
   if(err){alert('保存失败: '+err.message);return;}
+  window._venueEvtsMap=null;
   closeModal('evtModal');
   await logAction(id?'update':'create','events',court?`${payload.name}（${court}）`:payload.name);
   // Refresh active view
@@ -880,6 +884,7 @@ async function delEvent(id){
   if(!confirm('确定删除该赛事？')) return;
   const {error}=await db.from('events').delete().eq('id',id);
   if(error){alert('删除失败: '+error.message);return;}
+  window._venueEvtsMap=null;
   await renderEvents();
   await logAction('delete','events',id);
 }
@@ -889,16 +894,23 @@ let _venueQ='';
 async function renderVenues(){
   document.getElementById('pageActions').innerHTML=`<button class="btn btn-primary" onclick="openVenueModal(null)">＋ 添加场馆</button>`;
   document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
-  const [{data:vd},{data:ed}]=await Promise.all([
-    db.from('venues').select('*').order('name'),
-    db.from('events').select('id,venue_id,start_time,end_time,notes').order('start_time')
-  ]);
-  VENUES=vd||[];
-  window._venueEvtsMap={};
-  (ed||[]).forEach(e=>{
-    if(!window._venueEvtsMap[e.venue_id]) window._venueEvtsMap[e.venue_id]=[];
-    window._venueEvtsMap[e.venue_id].push(e);
-  });
+  if(window._venueEvtsMap){
+    // Events already cached — only reload venues
+    const {data:vd}=await db.from('venues').select('*').order('name');
+    VENUES=vd||[];
+  } else {
+    // First load or cache invalidated — fetch both
+    const [{data:vd},{data:ed}]=await Promise.all([
+      db.from('venues').select('*').order('name'),
+      db.from('events').select('id,venue_id,start_time,end_time,notes').order('start_time')
+    ]);
+    VENUES=vd||[];
+    window._venueEvtsMap={};
+    (ed||[]).forEach(e=>{
+      if(!window._venueEvtsMap[e.venue_id]) window._venueEvtsMap[e.venue_id]=[];
+      window._venueEvtsMap[e.venue_id].push(e);
+    });
+  }
   _venueQ='';
   document.getElementById('pageSub').textContent=`共 ${VENUES.length} 个场馆`;
   renderVenueTable();
@@ -1297,6 +1309,7 @@ function filterSchedVenue(vid){
 async function delSchedEvent(id){
   const {error}=await db.from('events').delete().eq('id',id);
   if(error){alert('删除失败: '+error.message);return;}
+  window._venueEvtsMap=null;
   EVENTS=EVENTS.filter(e=>e.id!==id);
   renderScheduleView();
   await logAction('delete','events',id);
@@ -1657,6 +1670,8 @@ async function confirmAiImport(){
     else{updOk++;const changes=(e._changes||[]).map(c=>`${c.f}:${c.old}→${c.nw}`).join(', ');logLines.push(`[更新] ${e.name} | ${changes}`);}
   }
 
+  // Invalidate venue events cache since events changed
+  if(insOk||updOk) window._venueEvtsMap=null;
   // Write formal audit log
   const summary=`AI导入 — 新增${insOk}条，更新${updOk}条${insFail+updFail?`，失败${insFail+updFail}条`:''}`;
   const detail=logLines.join('\n');
@@ -1864,6 +1879,8 @@ async function doImport(){
     else ok+=batch.length;
   }
 
+  // Invalidate venue events cache since events changed
+  if(ok>0) window._venueEvtsMap=null;
   // Log to import_history
   await db.from('import_history').insert({file_name:'CSV导入',total_rows:rows.length,success_rows:ok,failed_rows:fail,status:fail===0?'completed':'completed'}).catch(()=>{});
   await logAction('import','events',`导入 ${ok} 条赛事`);
