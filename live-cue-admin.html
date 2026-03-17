@@ -1334,16 +1334,21 @@ function isTeamEvent(ev){
 function renderImport(){
   const savedKey=localStorage.getItem('claude_api_key')||'';
   const savedModel=localStorage.getItem('claude_model')||'claude-opus-4-5';
+  const hasKey=!!savedKey;
   document.getElementById('pageTitle').textContent='智能导入';
-  document.getElementById('pageSub').textContent='支持 PDF · Excel · Word';
+  document.getElementById('pageSub').textContent='拖入文件 → AI解析 → 一键确认';
   document.getElementById('pageActions').innerHTML='';
   document.getElementById('content').innerHTML=`
-    <!-- API Key -->
-    <div class="section" style="margin-bottom:16px">
-      <div class="sec-head"><span class="sec-title">🤖 AI 模型配置</span></div>
-      <div style="padding:16px 20px;display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+    <!-- API Key — collapsed if already set -->
+    <div class="section" style="margin-bottom:12px">
+      <div class="sec-head" style="cursor:pointer" onclick="document.getElementById('apiCfgBody').style.display=document.getElementById('apiCfgBody').style.display==='none'?'':'none'">
+        <span class="sec-title">🤖 AI 配置</span>
+        <span id="apiKeyStatus" style="font-size:11px;color:${hasKey?'var(--ok)':'#ef4444'};margin-left:8px">${hasKey?'✓ 已配置 · '+savedModel:'⚠ 未配置 API Key'}</span>
+        <span style="font-size:11px;color:var(--t3);margin-left:auto">${hasKey?'点击展开修改':'点击展开配置'}</span>
+      </div>
+      <div id="apiCfgBody" style="display:${hasKey?'none':''};padding:16px 20px;display:${hasKey?'none':'flex'};gap:12px;align-items:flex-end;flex-wrap:wrap">
         <div class="field" style="flex:1;min-width:280px;margin:0">
-          <label>Claude API Key <span style="color:var(--t3);font-weight:400">(存储在本地，不上传)</span></label>
+          <label>Claude API Key <span style="color:var(--t3);font-weight:400">(本地存储，不上传)</span></label>
           <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-…" value="${savedKey}"
             style="font-family:var(--mono);font-size:11px">
         </div>
@@ -1358,39 +1363,59 @@ function renderImport(){
           </select>
         </div>
         <button class="btn btn-primary" onclick="saveApiKey()" style="margin-bottom:1px">保存配置</button>
-        <span id="apiKeyStatus" style="font-size:11px;color:var(--t3);align-self:center"></span>
       </div>
     </div>
-    <!-- Upload zone -->
-    <div class="section" style="margin-bottom:16px">
-      <div class="sec-head"><span class="sec-title">📂 上传文件</span></div>
-      <div style="padding:20px">
-        <div class="drop-zone" id="dz" onclick="document.getElementById('fileIn').click()" style="cursor:pointer">
-          <div class="drop-icon">📂</div>
-          <div class="drop-txt">点击选择 或 拖入文件</div>
-          <div class="drop-sub">支持 Excel (.xlsx .xls) · Word (.docx) · PDF (.pdf) · CSV (.csv)</div>
+    <!-- Upload zone — prominent -->
+    <div class="section" style="margin-bottom:12px">
+      <div style="padding:16px 20px 20px">
+        <div class="drop-zone" id="dz" onclick="document.getElementById('fileIn').click()"
+          style="cursor:pointer;border-width:2px;min-height:110px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px">
+          <div style="font-size:28px;line-height:1">📂</div>
+          <div style="font-size:15px;font-weight:700;color:var(--t1)">拖入文件 或 点击选择</div>
+          <div style="font-size:11px;color:var(--t3)">Excel (.xlsx .xls) · Word (.docx) · PDF · CSV</div>
         </div>
         <input type="file" id="fileIn" accept=".xlsx,.xls,.csv,.docx,.pdf"
           style="display:none" onchange="handleSmartFile(this)">
-        <div id="fileStatus" style="margin-top:12px;font-size:12px;color:var(--t3)"></div>
+        <!-- Progress steps -->
+        <div id="fileStatus" style="margin-top:10px;font-size:12px;color:var(--t3)"></div>
+        <div id="importProgress" style="display:none;margin-top:10px">
+          <div style="display:flex;gap:0;border-radius:6px;overflow:hidden;font-size:11px;font-weight:600">
+            <div id="step1" style="flex:1;padding:6px 0;text-align:center;background:var(--gl);color:var(--t3)">① 读取文件</div>
+            <div id="step2" style="flex:1;padding:6px 0;text-align:center;background:var(--gl);color:var(--t3);border-left:1px solid var(--b1)">② AI分析</div>
+            <div id="step3" style="flex:1;padding:6px 0;text-align:center;background:var(--gl);color:var(--t3);border-left:1px solid var(--b1)">③ 比对差异</div>
+            <div id="step4" style="flex:1;padding:6px 0;text-align:center;background:var(--gl);color:var(--t3);border-left:1px solid var(--b1)">④ 确认写入</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Sticky confirm bar (hidden until diff ready) -->
+    <div id="stickyConfirm" style="display:none;position:sticky;top:0;z-index:100;background:var(--acc);color:#fff;padding:10px 20px;border-radius:8px;margin-bottom:12px;display:none;align-items:center;gap:16px;box-shadow:0 4px 16px rgba(0,0,0,.2)">
+      <div>
+        <div style="font-size:13px;font-weight:700" id="stickyTitle">解析完成</div>
+        <div style="font-size:11px;opacity:.85" id="stickyDesc"></div>
+      </div>
+      <div style="margin-left:auto;display:flex;gap:8px">
+        <button class="btn" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3);font-size:13px;padding:8px 20px;font-weight:700" onclick="confirmAiImport()">✓ 确认全部变更</button>
+        <button class="btn" style="background:transparent;color:rgba(255,255,255,.7);border:none;font-size:12px" onclick="document.getElementById('aiResultSection').style.display='none';document.getElementById('stickyConfirm').style.display='none';_diffResult=null">取消</button>
       </div>
     </div>
     <!-- AI Analysis result -->
-    <div class="section" id="aiResultSection" style="display:none;margin-bottom:16px">
+    <div class="section" id="aiResultSection" style="display:none;margin-bottom:12px">
       <div class="sec-head">
-        <span class="sec-title">🔍 AI 解析结果</span>
+        <span class="sec-title">🔍 解析结果</span>
         <span class="sec-cnt" id="aiResultCnt">0 条</span>
-        <div class="sec-actions">
-          <button class="btn btn-ghost btn-sm" onclick="document.getElementById('aiResultSection').style.display='none'">清除</button>
-          <button class="btn btn-primary btn-sm" onclick="confirmAiImport()">✓ 确认导入数据库</button>
-        </div>
       </div>
       <div id="aiResultBody" style="padding:0"></div>
     </div>
-    <!-- Import history / log -->
+    <!-- Import history -->
     <div class="section">
-      <div class="sec-head"><span class="sec-title">📋 导入日志</span><span class="sec-cnt">最近20条</span></div>
-      <div id="importHist"><div style="padding:20px;text-align:center;color:var(--t3)">加载中…</div></div>
+      <div class="sec-head" style="cursor:pointer" onclick="document.getElementById('importHistBody').style.display=document.getElementById('importHistBody').style.display==='none'?'':'none'">
+        <span class="sec-title">📋 导入日志</span><span class="sec-cnt">最近10条</span>
+        <span style="font-size:11px;color:var(--t3);margin-left:auto">展开 ▾</span>
+      </div>
+      <div id="importHistBody" style="display:none">
+        <div id="importHist"><div style="padding:20px;text-align:center;color:var(--t3)">加载中…</div></div>
+      </div>
     </div>`;
 
   // Drag-drop
@@ -1402,7 +1427,18 @@ function renderImport(){
     const f=e.dataTransfer.files[0];if(f)processSmartFile(f);
   });
   loadImportHist();
-  if(savedKey) document.getElementById('apiKeyStatus').textContent='✓ 已配置';
+}
+
+function setStep(n){
+  [1,2,3,4].forEach(i=>{
+    const el=document.getElementById('step'+i);
+    if(!el) return;
+    if(i<n){el.style.background='rgba(16,185,129,.15)';el.style.color='#10b981';}
+    else if(i===n){el.style.background='rgba(139,92,246,.15)';el.style.color='var(--acc)';}
+    else{el.style.background='var(--gl)';el.style.color='var(--t3)';}
+  });
+  const prog=document.getElementById('importProgress');
+  if(prog) prog.style.display='';
 }
 
 function saveApiKey(){
@@ -1421,7 +1457,12 @@ async function processSmartFile(file){
   await loadVenueMap();
   const st=document.getElementById('fileStatus');
   const ext=file.name.split('.').pop().toLowerCase();
-  st.innerHTML=`<span style="color:var(--up)">⏳ 正在读取文件：${file.name}…</span>`;
+  setStep(1);
+  st.innerHTML=`<span style="color:var(--up)">① 读取文件：${file.name}…</span>`;
+  // Reset previous results
+  const sec=document.getElementById('aiResultSection');if(sec)sec.style.display='none';
+  const sc=document.getElementById('stickyConfirm');if(sc)sc.style.display='none';
+  _diffResult=null;
   let rawText='';
   try{
     if(ext==='csv'){
@@ -1435,9 +1476,11 @@ async function processSmartFile(file){
     } else {
       st.innerHTML='<span style="color:#ef4444">不支持的文件格式</span>';return;
     }
-    st.innerHTML=`<span style="color:var(--ok)">✓ 文件读取成功（${rawText.length} 字符）</span> — <span style="color:var(--up)">⏳ AI 分析中…</span>`;
+    setStep(2);
+    st.innerHTML=`<span style="color:var(--ok)">① 读取完成（${rawText.length} 字符）</span>　<span style="color:var(--up)">② AI 分析中，请稍候…</span>`;
     await analyzeWithClaude(rawText, file.name);
   } catch(e){
+    const prog=document.getElementById('importProgress');if(prog)prog.style.display='none';
     st.innerHTML=`<span style="color:#ef4444">错误：${e.message}</span>`;
   }
 }
@@ -1625,7 +1668,8 @@ ${rawText.slice(0,15000)}
       }catch(pe){throw new Error('JSON 解析失败：'+pe.message+'\n片段：'+candidate.slice(0,200));}
     }
     if(!_aiParsedEvents.length) throw new Error('AI 未能从文件中提取到任何赛事，请检查文件内容是否包含赛程数据');
-    document.getElementById('fileStatus').innerHTML=`<span style="color:var(--ok)">✓ AI 解析完成，发现 ${_aiParsedEvents.length} 条赛事</span>`;
+    setStep(3);
+    document.getElementById('fileStatus').innerHTML=`<span style="color:var(--ok)">② AI 解析完成，发现 ${_aiParsedEvents.length} 条赛事</span>　<span style="color:var(--up)">③ 比对差异中…</span>`;
     renderAiResult(_aiParsedEvents, fileName);
     await logAction('import','events',`AI解析文件 [${fileName}] 发现 ${_aiParsedEvents.length} 条赛事`);
   } catch(e){
@@ -1714,21 +1758,50 @@ async function renderAiResult(parsedEvents, fileName){
     </table></div>`;
   }
 
-  document.getElementById('aiResultBody').innerHTML=`
-    <div style="padding:14px 20px;background:rgba(16,185,129,.06);border-bottom:1px solid var(--b1);display:flex;gap:20px;flex-wrap:wrap;align-items:center">
-      <span style="font-size:12px;color:#10b981;font-weight:700">🆕 新增 ${newEvts.length} 条</span>
-      <span style="font-size:12px;color:#f59e0b;font-weight:700">✏️ 变更 ${modEvts.length} 条</span>
-      <span style="font-size:12px;color:var(--t3)">✓ 重复 ${dupEvts.length} 条</span>
-      ${skipEvts.length?`<span style="font-size:12px;color:#94a3b8">⏭ 不明确 ${skipEvts.length} 条（不修改）</span>`:''}
-      ${badEvts.length?`<span style="font-size:12px;color:#ef4444;font-weight:700">⚠️ 未匹配 ${badEvts.length} 条</span>`:''}
-      <button class="btn btn-primary" style="margin-left:auto" onclick="confirmAiImport()">✓ 确认写入数据库</button>
-      <button class="btn btn-ghost" onclick="document.getElementById('aiResultSection').style.display='none';_diffResult=null">取消</button>
-    </div>
-    ${newEvts.length?`<div style="padding:10px 20px 4px"><span style="font-size:11px;font-weight:700;color:#10b981">🆕 新增（将插入）</span></div>${diffTable(newEvts,'new')}`:''}
-    ${modEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#f59e0b">✏️ 变更（将更新，明确匹配）</span></div>${diffTable(modEvts,'mod')}`:''}
-    ${dupEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:var(--t3)">✓ 重复（内容相同，跳过）</span></div>${diffTable(dupEvts,'dup')}`:''}
-    ${skipEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#94a3b8">⏭ 识别不明确（已跳过，不做修改）</span><span style="font-size:10px;color:var(--t3);margin-left:8px">找到多条同名记录无法确认对应哪一条</span></div>${diffTable(skipEvts,'bad')}`:''}
-    ${badEvts.length?`<div style="padding:10px 20px 4px;border-top:1px solid var(--b1)"><span style="font-size:11px;font-weight:700;color:#ef4444">⚠️ 无法导入（场馆未匹配）</span></div>${diffTable(badEvts,'bad')}`:''}`;
+  // Update file status step
+  setStep(4);
+  const actionCount=newEvts.length+modEvts.length;
+  document.getElementById('fileStatus').innerHTML=
+    actionCount
+      ? `<span style="color:var(--ok)">③ 比对完成 — <strong>${actionCount} 项变更</strong>需要确认（${newEvts.length}新增 · ${modEvts.length}变更）</span>`
+      : `<span style="color:var(--t3)">③ 比对完成 — 无变更（数据已是最新）</span>`;
+
+  // Collapsible section helper
+  function collapsibleSection(id, label, count, colorCss, content, defaultOpen){
+    return `
+    <div style="border-top:1px solid var(--b1)">
+      <div style="padding:10px 20px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none" onclick="const b=document.getElementById('dss_${id}');b.style.display=b.style.display==='none'?'':'none'">
+        <span style="font-size:11px;font-weight:700;${colorCss}">${label}</span>
+        <span style="font-size:11px;background:var(--gl);border-radius:10px;padding:1px 8px;color:var(--t3)">${count} 条</span>
+        <span style="font-size:11px;color:var(--t3);margin-left:auto">${defaultOpen?'▾':'▸'} 点击${defaultOpen?'收起':'展开'}</span>
+      </div>
+      <div id="dss_${id}" style="display:${defaultOpen?'':'none'}">${content}</div>
+    </div>`;
+  }
+
+  document.getElementById('aiResultBody').innerHTML=
+    (newEvts.length||modEvts.length
+      ? collapsibleSection('new','🆕 新增（将插入）',newEvts.length,'color:#10b981',diffTable(newEvts,'new'),true)
+        + collapsibleSection('mod','✏️ 变更（将更新）',modEvts.length,'color:#f59e0b',diffTable(modEvts,'mod'),true)
+      : `<div style="padding:20px;text-align:center;color:var(--t3);font-size:13px">✅ 无变更 — 数据库已是最新</div>`)
+    + (dupEvts.length ? collapsibleSection('dup','✓ 重复（内容相同，跳过）',dupEvts.length,'color:var(--t3)',diffTable(dupEvts,'dup'),false) : '')
+    + (skipEvts.length ? collapsibleSection('skip','⏭ 识别不明确（跳过，不修改）',skipEvts.length,'color:#94a3b8',diffTable(skipEvts,'bad'),false) : '')
+    + (badEvts.length ? collapsibleSection('bad','⚠️ 无法导入（场馆未匹配）',badEvts.length,'color:#ef4444',diffTable(badEvts,'bad'),false) : '');
+
+  // Show result section
+  const sec=document.getElementById('aiResultSection');
+  sec.style.display='';
+  sec.scrollIntoView({behavior:'smooth',block:'start'});
+
+  // Show sticky confirm bar if there's anything to do
+  if(actionCount){
+    const sc=document.getElementById('stickyConfirm');
+    if(sc){
+      document.getElementById('stickyTitle').textContent=`解析完成 · ${actionCount} 项变更待确认`;
+      document.getElementById('stickyDesc').textContent=`🆕 新增 ${newEvts.length} 条  ✏️ 变更 ${modEvts.length} 条  （其余 ${dupEvts.length+skipEvts.length+badEvts.length} 条已跳过）`;
+      sc.style.display='flex';
+    }
+  }
 }
 
 function diffSelAll(cb,type){
@@ -1789,19 +1862,23 @@ async function confirmAiImport(){
   await logAction('import','events',summary+'\n'+detail);
 
   if(btn){btn.disabled=false;btn.textContent='✓ 确认写入数据库';}
+  // Hide sticky bar
+  const sc=document.getElementById('stickyConfirm');if(sc)sc.style.display='none';
   // Show result in place
   document.getElementById('aiResultBody').innerHTML=`
     <div style="padding:24px 20px">
-      <div style="font-size:14px;font-weight:700;color:#10b981;margin-bottom:12px">✓ 导入完成</div>
-      ${insOk?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">🆕 新增：${insOk} 条成功${insFail?`，${insFail} 条失败`:''}</div>`:''}
-      ${updOk?`<div style="font-size:12px;color:var(--t2);margin-bottom:4px">✏️ 更新：${updOk} 条成功${updFail?`，${updFail} 条失败`:''}</div>`:''}
+      <div style="font-size:16px;font-weight:700;color:#10b981;margin-bottom:14px">✅ 导入完成</div>
+      ${insOk?`<div style="font-size:13px;color:var(--t1);margin-bottom:6px">🆕 新增：<strong>${insOk}</strong> 条成功${insFail?`，${insFail} 条失败`:''}</div>`:''}
+      ${updOk?`<div style="font-size:13px;color:var(--t1);margin-bottom:6px">✏️ 更新：<strong>${updOk}</strong> 条成功${updFail?`，${updFail} 条失败`:''}</div>`:''}
       <div style="margin-top:12px;padding:10px 14px;background:var(--gl);border-radius:6px;font-size:10px;font-family:var(--mono);color:var(--t3);max-height:180px;overflow-y:auto;line-height:1.8;white-space:pre">${logLines.join('\n')}</div>
-      <div style="margin-top:12px;display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="show('schedule')">查看赛程 →</button>
-        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('aiResultSection').style.display='none';_diffResult=null">关闭</button>
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="show('schedule')">查看赛程 →</button>
         <button class="btn btn-ghost btn-sm" onclick="show('audit')">查看日志 →</button>
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('aiResultSection').style.display='none';_diffResult=null">关闭</button>
       </div>
     </div>`;
+  setStep&&setStep(5);
+  document.getElementById('fileStatus').innerHTML=`<span style="color:var(--ok)">✅ 全部完成 — 新增 ${insOk}，更新 ${updOk}${insFail+updFail?`，失败 ${insFail+updFail}`:''}</span>`;
   _diffResult=null;
 }
 async function loadImportHist(){
