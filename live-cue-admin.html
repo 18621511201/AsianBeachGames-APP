@@ -919,14 +919,31 @@ function renderVenueTable(){
       <div class="table-wrap"><table id="venueTbl">
         <tr>
           <th style="width:32px"><input type="checkbox" class="cb" id="vSelAll" onclick="venueSelAll(this.checked)"></th>
-          <th>场馆名称</th><th>简称</th><th>运动项目</th><th>位置</th><th>颜色</th><th>状态</th><th>操作</th>
+          <th>场馆名称</th><th>简称</th><th>运动项目</th><th style="min-width:160px">位置 / 子场地</th><th>颜色</th><th>状态</th><th>操作</th>
         </tr>
         ${filt.map(v=>`<tr id="vr-${v.id}">
           <td><input type="checkbox" class="cb vsb" value="${v.id}" onchange="venueChkChange()"></td>
           <td style="color:var(--t1);font-weight:500">${v.name}</td>
           <td>${v.short_name||'—'}</td>
           <td>${v.sport||'—'}</td>
-          <td>${(()=>{const {loc,courts}=parseVenueLocJson(v.location||'');const c=courts.filter(x=>x.on!==false);return (loc||'—')+(c.length?` <span style="font-size:10px;color:var(--acc)">${c.map(x=>x.n).join('/')}</span>`:'')})()} </td>
+          <td>${(()=>{
+            const {loc,courts}=parseVenueLocJson(v.location||'');
+            const locStr=loc||'—';
+            if(!courts.length) return locStr;
+            const tags=courts.map(c=>{
+              const on=c.on!==false;
+              return `<span onclick="toggleCourt('${v.id}','${c.n.replace(/'/g,"\\'")}');event.stopPropagation()"
+                style="display:inline-flex;align-items:center;gap:3px;cursor:pointer;font-size:10px;
+                  padding:1px 7px 1px 5px;border-radius:10px;margin:1px 2px;user-select:none;
+                  background:${on?'rgba(207,107,60,.18)':'rgba(255,255,255,.06)'};
+                  border:1px solid ${on?'var(--acc)':'var(--t3)'};
+                  color:${on?'var(--acc)':'var(--t3)'};"
+                title="${c.n} — 点击${on?'关闭':'开启'}前台及导出显示">
+                <span style="font-size:9px">${on?'●':'○'}</span>${c.n}
+              </span>`;
+            }).join('');
+            return `<div style="font-size:11px;color:var(--t2);margin-bottom:2px">${locStr}</div><div style="display:flex;flex-wrap:wrap;gap:1px">${tags}</div>`;
+          })()} </td>
           <td><div style="display:flex;align-items:center;gap:6px"><div style="width:14px;height:14px;border-radius:3px;background:${v.color||'#888'}"></div><span style="font-size:11px;color:var(--t3)">${v.color||'—'}</span></div></td>
           <td><span class="badge ${v.is_active?'sched':'done'}">${v.is_active?'启用':'停用'}</span></td>
           <td><div style="display:flex;gap:4px">
@@ -1016,6 +1033,20 @@ async function saveVenue(){
 
 /* ── SCHEDULE VIEW ── */
 let _schedVenueFilter=null;
+async function toggleCourt(venueId, courtName){
+  const venue=VENUES.find(v=>v.id===venueId);
+  if(!venue) return;
+  const {loc,courts}=parseVenueLocJson(venue.location||'');
+  const idx=courts.findIndex(c=>c.n===courtName);
+  if(idx<0) return;
+  courts[idx].on=!courts[idx].on;
+  const newLoc=JSON.stringify({loc,courts});
+  const {error}=await db.from('venues').update({location:newLoc}).eq('id',venueId);
+  if(error){alert('保存失败: '+error.message);return;}
+  venue.location=newLoc;
+  renderVenueTable();
+}
+
 async function renderSchedule(){
   document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
   document.getElementById('pageActions').innerHTML=`
