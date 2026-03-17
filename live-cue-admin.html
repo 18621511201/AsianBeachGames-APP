@@ -2493,6 +2493,34 @@ td,th{padding:0;vertical-align:middle}
   setTimeout(()=>w.print(),1200);
 }
 
+/* ── AUDIT ── */
+async function renderAudit(){
+  document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
+  const {data}=await db.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(50);
+  LOGS=data||[];
+  const icons={create:'＋',update:'✎',delete:'✕',import:'⇧',login:'◉'};
+  document.getElementById('content').innerHTML=`
+    <div class="section">
+      <div class="sec-head"><span class="sec-title">操作日志</span><span class="sec-cnt">最近50条</span></div>
+      ${LOGS.length?LOGS.map(l=>`
+        <div class="log-row">
+          <div class="log-icon ${l.action}">${icons[l.action]||'●'}</div>
+          <div class="log-body">
+            <div class="log-action">${l.summary||`${l.action} · ${l.table_name}`}</div>
+            <div class="log-meta">${l.user_email||'system'} · ${fmtDT(new Date(l.created_at).getTime())}</div>
+          </div>
+        </div>`).join(''):'<div style="padding:30px;text-align:center;color:var(--t3)">暂无日志</div>'}
+    </div>`;
+}
+async function logAction(action,table,summary){
+  if(!CUR_USER) return;
+  await fetch(`${SB_URL}/rest/v1/audit_logs`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC},
+    body:JSON.stringify({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary})
+  }).catch(()=>{});
+}
+
 function statusBadge(s){
   const map={live:'<span class="badge live"><span class="dot live"></span>直播中</span>',scheduled:'<span class="badge sched">计划中</span>',finished:'<span class="badge done">已完成</span>',cancelled:'<span class="badge done">已取消</span>',completed:'<span class="badge done">已完成</span>'};
   return map[s]||`<span class="badge">${s}</span>`;
