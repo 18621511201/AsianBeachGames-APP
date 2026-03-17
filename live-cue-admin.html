@@ -1333,6 +1333,7 @@ function isTeamEvent(ev){
 
 function renderImport(){
   const savedKey=localStorage.getItem('claude_api_key')||'';
+  const savedModel=localStorage.getItem('claude_model')||'claude-3-5-haiku-20241022';
   document.getElementById('pageTitle').textContent='智能导入';
   document.getElementById('pageSub').textContent='支持 PDF · Excel · Word';
   document.getElementById('pageActions').innerHTML='';
@@ -1346,7 +1347,16 @@ function renderImport(){
           <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-…" value="${savedKey}"
             style="font-family:var(--mono);font-size:11px">
         </div>
-        <button class="btn btn-primary" onclick="saveApiKey()" style="margin-bottom:1px">保存密钥</button>
+        <div class="field" style="min-width:220px;margin:0">
+          <label>模型</label>
+          <select id="modelSelect" style="font-family:var(--mono);font-size:11px">
+            <option value="claude-3-5-haiku-20241022" ${savedModel==='claude-3-5-haiku-20241022'?'selected':''}>claude-3-5-haiku-20241022（推荐）</option>
+            <option value="claude-3-5-sonnet-20241022" ${savedModel==='claude-3-5-sonnet-20241022'?'selected':''}>claude-3-5-sonnet-20241022</option>
+            <option value="claude-3-haiku-20240307" ${savedModel==='claude-3-haiku-20240307'?'selected':''}>claude-3-haiku-20240307</option>
+            <option value="claude-3-opus-20240229" ${savedModel==='claude-3-opus-20240229'?'selected':''}>claude-3-opus-20240229</option>
+          </select>
+        </div>
+        <button class="btn btn-primary" onclick="saveApiKey()" style="margin-bottom:1px">保存配置</button>
         <span id="apiKeyStatus" style="font-size:11px;color:var(--t3);align-self:center"></span>
       </div>
     </div>
@@ -1398,6 +1408,8 @@ function saveApiKey(){
   const k=document.getElementById('apiKeyInput').value.trim();
   if(!k){alert('请输入有效的 API Key');return;}
   localStorage.setItem('claude_api_key',k);
+  const m=document.getElementById('modelSelect')?.value||'claude-3-5-haiku-20241022';
+  localStorage.setItem('claude_model',m);
   document.getElementById('apiKeyStatus').textContent='✓ 已保存';
   setTimeout(()=>document.getElementById('apiKeyStatus').textContent='',2000);
 }
@@ -1484,6 +1496,7 @@ let _aiParsedEvents=[];
 
 async function analyzeWithClaude(rawText, fileName){
   const apiKey=localStorage.getItem('claude_api_key')||'';
+  const model=localStorage.getItem('claude_model')||'claude-3-5-haiku-20241022';
   if(!apiKey){
     document.getElementById('fileStatus').innerHTML='<span style="color:#ef4444">请先填写并保存 Claude API Key</span>';return;
   }
@@ -1520,12 +1533,16 @@ ${rawText.slice(0,12000)}
         'anthropic-dangerous-direct-browser-access':'true'
       },
       body:JSON.stringify({
-        model:'claude-3-5-sonnet-20241022',
+        model:model,
         max_tokens:4096,
         messages:[{role:'user',content:prompt}]
       })
     });
-    if(!resp.ok){const e=await resp.json();throw new Error(e.error?.message||`API错误 ${resp.status}`);}
+    if(!resp.ok){
+      let errMsg=`API错误 ${resp.status}`;
+      try{const e=await resp.json();errMsg=e.error?.message||JSON.stringify(e);}catch(_){}
+      throw new Error(errMsg);
+    }
     const data=await resp.json();
     let txt=data.content[0].text.trim();
     // Strip markdown code fences if present (```json ... ``` or ``` ... ```)
