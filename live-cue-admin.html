@@ -1333,7 +1333,7 @@ function isTeamEvent(ev){
 
 function renderImport(){
   const savedKey=localStorage.getItem('claude_api_key')||'';
-  const savedModel=localStorage.getItem('claude_model')||'claude-3-5-haiku-20241022';
+  const savedModel=localStorage.getItem('claude_model')||'claude-opus-4-5';
   document.getElementById('pageTitle').textContent='智能导入';
   document.getElementById('pageSub').textContent='支持 PDF · Excel · Word';
   document.getElementById('pageActions').innerHTML='';
@@ -1350,10 +1350,11 @@ function renderImport(){
         <div class="field" style="min-width:220px;margin:0">
           <label>模型</label>
           <select id="modelSelect" style="font-family:var(--mono);font-size:11px">
-            <option value="claude-3-5-haiku-20241022" ${savedModel==='claude-3-5-haiku-20241022'?'selected':''}>claude-3-5-haiku-20241022（推荐）</option>
+            <option value="claude-opus-4-5" ${savedModel==='claude-opus-4-5'?'selected':''}>claude-opus-4-5（推荐）</option>
+            <option value="claude-sonnet-4-5" ${savedModel==='claude-sonnet-4-5'?'selected':''}>claude-sonnet-4-5</option>
+            <option value="claude-haiku-4-5" ${savedModel==='claude-haiku-4-5'?'selected':''}>claude-haiku-4-5</option>
             <option value="claude-3-5-sonnet-20241022" ${savedModel==='claude-3-5-sonnet-20241022'?'selected':''}>claude-3-5-sonnet-20241022</option>
-            <option value="claude-3-haiku-20240307" ${savedModel==='claude-3-haiku-20240307'?'selected':''}>claude-3-haiku-20240307</option>
-            <option value="claude-3-opus-20240229" ${savedModel==='claude-3-opus-20240229'?'selected':''}>claude-3-opus-20240229</option>
+            <option value="claude-3-5-haiku-20241022" ${savedModel==='claude-3-5-haiku-20241022'?'selected':''}>claude-3-5-haiku-20241022</option>
           </select>
         </div>
         <button class="btn btn-primary" onclick="saveApiKey()" style="margin-bottom:1px">保存配置</button>
@@ -1571,7 +1572,8 @@ ${rawText.slice(0,12000)}
     renderAiResult(_aiParsedEvents, fileName);
     await logAction('import','events',`AI解析文件 [${fileName}] 发现 ${_aiParsedEvents.length} 条赛事`);
   } catch(e){
-    document.getElementById('fileStatus').innerHTML=`<span style="color:#ef4444">AI分析失败：${e.message}</span>`;
+    const escMsg=e.message.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    document.getElementById('fileStatus').innerHTML=`<span style="color:#ef4444">AI分析失败：${escMsg}</span>`;
   }
 }
 
