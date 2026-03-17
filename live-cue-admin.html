@@ -2200,7 +2200,7 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
     }
     // Build table rows
     let rowsHtml=''; let seqNum=0;
-    (window._venueMap||[]).forEach(venue=>{
+    (VENUES||[]).forEach(venue=>{
       const vEvts=evts.filter(e=>e.venue_id===venue.id);
       if(!vEvts.length) return;
       let lanes=[];
