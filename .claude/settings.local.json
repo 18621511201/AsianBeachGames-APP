@@ -17,7 +17,16 @@
       "Bash(open \"https://supabase.com/dashboard/project/mdgfcgxtlxgzkvoiqonp/auth/users\")",
       "Bash(awk 'NR>=2190 && NR<=2360' live-cue-admin.html)",
       "Bash(awk 'NR>=2152 && NR<=2200' live-cue-admin.html)",
-      "Bash(awk 'NR>=1939 && NR<=2000' live-cue-admin.html)"
+      "Bash(awk 'NR>=1939 && NR<=2000' live-cue-admin.html)",
+      "Bash(awk '/=== 变更/,/=== 新增/')",
+      "Bash(head -10 find /Users/romandemac/Desktop -name *.xlsx)",
+      "Bash(grep -r \"service_role\\\\|SERVICE_KEY\\\\|sb_secret\\\\|service.*key\\\\|serviceRole\" '/Users/romandemac/Desktop/Asian Beach APP' --include=*.js --include=*.ts --include=*.env* --include=*.json -l)",
+      "Bash(grep -r \"service_role\\\\|SERVICE\\\\|supabase.*key\\\\|eyJ\" '/Users/romandemac/Desktop/Asian Beach APP' --include=*.env --include=*.env.local --include=*.env.production -l 2)",
+      "Bash(/dev/null ls:*)",
+      "Bash(grep -r eyJ '/Users/romandemac/Desktop/Asian Beach APP' --include=*.js --include=*.ts --include=*.json -h)",
+      "Bash(netlify deploy:*)",
+      "Bash(find /Users/romandemac -maxdepth 5 -type d -name *Asian* -o -type d -name *Beach*)",
+      "Bash(find /Users/romandemac -maxdepth 10 -name *.html -not -path */node_modules/* -not -path */.git/* -not -path */Library/*)"
     ]
   }
 }

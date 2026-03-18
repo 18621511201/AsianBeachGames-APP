@@ -515,7 +515,7 @@ async function doLogin(){
 }
 async function doLogout(){
   await db.auth.signOut();
-  location.reload();
+  location.href='live-cue-themes.html';
 }
 function showApp(){
   document.getElementById('loginPage').style.display='none';
