@@ -2576,12 +2576,12 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
       const hh=Math.floor((m+1440)%1440/60);
       hTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.5)"></div>`
              +`<span style="position:absolute;left:${x+3}px;top:50%;transform:translateY(-50%);font-size:8px;font-weight:700;color:#fff;white-space:nowrap;font-family:monospace">${p2(hh)}:00</span>`;
-      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:#cbd5e1"></div>`;
+      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:#cbd5e1;z-index:1;opacity:0.6;pointer-events:none"></div>`;
     }
     for(let m=startMin+30;m<endMin;m+=60){
       const x=Math.round((m-startMin)/60*pxPerHr);
       hTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:rgba(255,255,255,0.2)"></div>`;
-      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:#edf2f7;border-left:1px dashed #edf2f7"></div>`;
+      gTicks+=`<div style="position:absolute;left:${x}px;top:0;bottom:0;width:1px;background:#edf2f7;border-left:1px dashed #edf2f7;z-index:1;opacity:0.6;pointer-events:none"></div>`;
     }
 
     // ── Build table rows ──
@@ -2652,8 +2652,8 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
           }
           const blkColor=isT?(ev.is_medal_event?'#e07b1a':'#3a8c4e'):venue.color;
           const fs=numSub>1?6.5:7.5;
-          blocks+=`<div style="position:absolute;left:${ex}px;width:${ew}px;top:${bTop}px;height:${bH}px;background:${blkColor};overflow:hidden;z-index:${2+si};padding:1px 3px;box-sizing:border-box;border-radius:2px">`
-                 +`<div style="font-size:${fs}px;font-weight:700;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:${bH<=14?'1.2em':'2.4em'}">${ev.name}</div>`
+          blocks+=`<div style="position:absolute;left:${ex}px;width:${ew}px;top:${bTop}px;height:${bH}px;background:${blkColor};overflow:hidden;z-index:${3+si};padding:1px 3px;box-sizing:border-box;border-radius:2px">`
+                 +`<div style="font-size:${fs}px;font-weight:700;color:#fff;line-height:1.25;word-break:break-all;overflow:hidden;max-height:${bH}px">${ev.name}</div>`
                  +(bH>13?`<div style="font-size:6px;color:rgba(255,255,255,.9);line-height:1.1">${stStr}</div>`:'')
                  +`</div>`;
         });
@@ -2752,7 +2752,10 @@ function exportAsPdf(events,rtype,fileName,nowStr,dateLabel){
 </div>`;
   }).join('');
 
-  const html=`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>${fileName}</title><style>
+  const html=`<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8"><title>${fileName}</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
+<style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
 @page{size:${orient==='portrait'?'A4 portrait':'A3 landscape'};margin:8mm}
 body{font-family:'Microsoft YaHei','Heiti SC',Arial,sans-serif;font-size:12px;color:#1a202c;background:#e2e8f0}
@@ -2768,14 +2771,9 @@ body{font-family:'Microsoft YaHei','Heiti SC',Arial,sans-serif;font-size:12px;co
 .ph-div{height:1px;background:#4a7aad!important}
 .ph-info{display:flex;gap:16px;padding:4px 0 7px;font-size:8.5px;color:#c8dff5}
 .pf{display:flex;justify-content:space-between;padding:6px 18px;background:#1e3a5f!important;font-size:8px;color:#c8dff5}
-table{border-collapse:collapse}
-td,th{padding:0;vertical-align:middle}
-#pdfbar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3a5f;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 20px;box-shadow:0 2px 8px rgba(0,0,0,.3);font-family:Arial,sans-serif;font-size:13px}
-#pdfbar button{background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:6px}
-#pdfbar button:hover{background:#1d4ed8}
-#pdfbar .hint{font-size:11px;color:#c8dff5;flex:1}
-#pdfbar .close-btn{background:rgba(255,255,255,.15);padding:6px 14px;font-weight:400;font-size:12px}
-#pdfbar .close-btn:hover{background:rgba(255,255,255,.25)}
+table{border-collapse:collapse;table-layout:fixed}
+td,th{padding:0;vertical-align:middle;overflow:hidden}
+#pdfbar{position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3a5f;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 20px;font-family:Arial,sans-serif;font-size:13px}
 body.has-bar{padding-top:52px}
 @media print{
   #pdfbar{display:none!important}
@@ -2784,12 +2782,51 @@ body.has-bar{padding-top:52px}
   .pg+.pg{page-break-before:always}
 }
 </style></head><body class="has-bar">
-<div id="pdfbar">
-  <button onclick="window.print()">📥 保存为 PDF</button>
-  <span class="hint">点击按钮 → 弹出打印对话框 → 打印机选择「另存为 PDF」→ 保存</span>
-  <button class="close-btn" onclick="document.getElementById('pdfbar').style.display='none';document.body.classList.remove('has-bar')">✕ 关闭提示</button>
+<div id="pdfbar" style="position:fixed;top:0;left:0;right:0;z-index:9999;background:#1e3a5f;color:#fff;display:flex;align-items:center;gap:12px;padding:10px 20px;font-family:Arial,sans-serif;font-size:13px">
+  <button id="dlbtn" disabled style="background:#2563eb;color:#fff;border:none;border-radius:6px;padding:8px 20px;font-size:13px;font-weight:700;cursor:pointer">&#128229; 下载 PDF</button>
+  <span id="dlhint" style="font-size:12px;color:#c8dff5">正在生成…</span>
 </div>
-${pagesHtml}</body></html>`;
+<div style="height:52px"></div>
+${pagesHtml}
+<script>
+window.addEventListener('load', async function() {
+  var bar = document.getElementById('pdfbar');
+  var btn = document.getElementById('dlbtn');
+  var hint = document.getElementById('dlhint');
+  hint.textContent = '正在生成 PDF，请稍候\u2026';
+  btn.disabled = true;
+  try {
+    var jsPDFLib = window.jspdf;
+    var jsPDF = jsPDFLib.jsPDF;
+    var isLand = ${orient==='landscape'?'true':'false'};
+    var pdf = new jsPDF({ orientation: isLand ? 'l' : 'p', unit: 'mm', format: isLand ? [420,297] : 'a4' });
+    var pages = document.querySelectorAll('.pg');
+    bar.style.display = 'none';
+    for (var i = 0; i < pages.length; i++) {
+      if (i > 0) pdf.addPage();
+      var canvas = await html2canvas(pages[i], { scale: 1.5, useCORS: true, logging: false, backgroundColor: '#ffffff' });
+      var imgData = canvas.toDataURL('image/jpeg', 0.88);
+      var pw = pdf.internal.pageSize.getWidth();
+      var ph = pdf.internal.pageSize.getHeight();
+      var ratio = Math.min(pw / (canvas.width / 1.5 / 96 * 25.4), ph / (canvas.height / 1.5 / 96 * 25.4));
+      var iw = (canvas.width / 1.5 / 96 * 25.4) * ratio;
+      var ih = (canvas.height / 1.5 / 96 * 25.4) * ratio;
+      pdf.addImage(imgData, 'JPEG', (pw - iw) / 2, 0, iw, ih);
+    }
+    pdf.save('${fileName}.pdf');
+    bar.style.display = 'flex';
+    hint.textContent = '\u2705 PDF 已下载';
+    btn.textContent = '\ud83d\udcE5 再次下载';
+    btn.disabled = false;
+    btn.onclick = function() { pdf.save('${fileName}.pdf'); };
+  } catch(err) {
+    bar.style.display = 'flex';
+    hint.textContent = '\u274c 生成失败：' + err.message;
+    btn.disabled = false;
+  }
+});
+<\/script>
+</body></html>`;
   const w=window.open('','_blank','width=1400,height=960,scrollbars=yes');
   if(!w){alert('请允许弹出窗口以生成PDF');return;}
   w.document.write(html);w.document.close();
