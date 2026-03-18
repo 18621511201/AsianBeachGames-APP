@@ -467,7 +467,6 @@ input[type=checkbox].cb{width:15px;height:15px;accent-color:var(--acc);cursor:po
 /* ── SUPABASE ── */
 const SB_URL='https://mdgfcgxtlxgzkvoiqonp.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2ZjZ3h0bHhnemt2b2lxb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTcwMjIsImV4cCI6MjA4OTEzMzAyMn0.ds9Ab_HkRNsUDSUrTlfJ5NpmlywgWwotNei4YX3Oo-k';
-const SB_SVC='sb_secret_LGFZ6XFx1Ri20x6bufWkIQ_wH-1IRK0';
 const {createClient}=supabase;
 const db=createClient(SB_URL,SB_KEY);
 
@@ -945,18 +944,21 @@ async function saveEvent(){
   const id=document.getElementById('evtId').value;
   const court=getCourtFromModal();
   const notesRaw=document.getElementById('evtNotes').value;
+  const startDt=new Date(document.getElementById('evtStart').value);
+  const endDt=new Date(document.getElementById('evtEnd').value);
   const payload={
     name:document.getElementById('evtName').value.trim(),
     venue_id:document.getElementById('evtVenue').value,
     round:document.getElementById('evtRound').value,
-    start_time:new Date(document.getElementById('evtStart').value).getTime(),
-    end_time:new Date(document.getElementById('evtEnd').value).getTime(),
+    start_time:startDt.toISOString(),
+    end_time:endDt.toISOString(),
     broadcast_channel:document.getElementById('evtCh').value||null,
     status:document.getElementById('evtStatus').value,
     is_medal_event:document.getElementById('evtMedal').checked,
     notes:buildCourtNotes(court, notesRaw),
   };
   if(!payload.name||!payload.venue_id){alert('请填写赛事名称和场馆');return;}
+  if(!isNaN(startDt)&&!isNaN(endDt)&&endDt<=startDt){alert('结束时间必须晚于开始时间');return;}
   let err;
   if(id){({error:err}=await db.from('events').update(payload).eq('id',id));}
   else {({error:err}=await db.from('events').insert(payload));}
@@ -1430,7 +1432,7 @@ function renderImport(){
         <span id="apiKeyStatus" style="font-size:11px;color:${hasKey?'var(--ok)':'#ef4444'};margin-left:8px">${hasKey?'✓ 已配置 · '+savedModel:'⚠ 未配置 API Key'}</span>
         <span style="font-size:11px;color:var(--t3);margin-left:auto">${hasKey?'点击展开修改':'点击展开配置'}</span>
       </div>
-      <div id="apiCfgBody" style="display:${hasKey?'none':''};padding:16px 20px;display:${hasKey?'none':'flex'};gap:12px;align-items:flex-end;flex-wrap:wrap">
+      <div id="apiCfgBody" style="padding:16px 20px;display:${hasKey?'none':'flex'};gap:12px;align-items:flex-end;flex-wrap:wrap">
         <div class="field" style="flex:1;min-width:280px;margin:0">
           <label>Claude API Key <span style="color:var(--t3);font-weight:400">(本地存储，不上传)</span></label>
           <input type="password" id="apiKeyInput" placeholder="sk-ant-api03-…" value="${savedKey}"
@@ -2853,11 +2855,7 @@ async function renderAudit(){
 }
 async function logAction(action,table,summary){
   if(!CUR_USER) return;
-  await fetch(`${SB_URL}/rest/v1/audit_logs`,{
-    method:'POST',
-    headers:{'Content-Type':'application/json','apikey':SB_SVC,'Authorization':'Bearer '+SB_SVC},
-    body:JSON.stringify({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary})
-  }).catch(()=>{});
+  await db.from('audit_logs').insert({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary}).catch(()=>{});
 }
 
 function statusBadge(s){
