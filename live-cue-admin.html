@@ -2856,8 +2856,14 @@ async function renderAudit(){
 async function logAction(action,table,summary){
   if(!CUR_USER) return;
   try{
-    const {error}=await db.from('audit_logs').insert({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary});
-    if(error) console.error('audit log failed:',error.message,error.code);
+    const {data:{session}}=await db.auth.getSession();
+    if(!session) return;
+    const resp=await fetch(`${SB_URL}/rest/v1/audit_logs`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Prefer':'return=minimal'},
+      body:JSON.stringify({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary})
+    });
+    if(!resp.ok) console.error('audit log failed:',resp.status,await resp.text());
   }catch(e){console.error('audit log exception:',e);}
 }
 
