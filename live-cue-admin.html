@@ -2856,11 +2856,9 @@ async function renderAudit(){
 async function logAction(action,table,summary){
   if(!CUR_USER) return;
   try{
-    const {data:{session}}=await db.auth.getSession();
-    if(!session) return;
-    const resp=await fetch(`${SB_URL}/rest/v1/audit_logs`,{
+    const resp=await fetch('/.netlify/functions/log-action',{
       method:'POST',
-      headers:{'Content-Type':'application/json','apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Prefer':'return=minimal'},
+      headers:{'Content-Type':'application/json'},
       body:JSON.stringify({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary})
     });
     if(!resp.ok) console.error('audit log failed:',resp.status,await resp.text());
