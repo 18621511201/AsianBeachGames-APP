@@ -2839,7 +2839,12 @@ window.addEventListener('load', async function() {
 /* ── AUDIT ── */
 async function renderAudit(){
   document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
-  const {data}=await db.from('audit_logs').select('*').order('created_at',{ascending:false}).limit(50);
+  let data=[];
+  try{
+    const resp=await fetch('/.netlify/functions/get-audit-logs?limit=50');
+    if(resp.ok) data=await resp.json();
+    else console.error('[AUDIT READ ERROR]',resp.status,await resp.text());
+  }catch(e){console.error('[AUDIT READ EXCEPTION]',e.message);}
   LOGS=data||[];
   const icons={create:'＋',update:'✎',delete:'✕',import:'⇧',login:'◉'};
   document.getElementById('content').innerHTML=`
