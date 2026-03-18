@@ -509,10 +509,12 @@ async function doLogin(){
     const {data:{session}}=await db.auth.getSession();
     CUR_USER=session.user;
     await loadProfile();
+    await logAction('login','auth',CUR_USER.email);
     showApp();
   }
 }
 async function doLogout(){
+  await logAction('logout','auth',CUR_USER?CUR_USER.email:'');
   await db.auth.signOut();
   location.href='live-cue-themes.html';
 }
@@ -2856,20 +2858,13 @@ async function renderAudit(){
 async function logAction(action,table,summary){
   if(!CUR_USER) return;
   try{
-    const {error}=await db.from('audit_logs').insert({
-      user_id:CUR_USER.id,
-      user_email:CUR_USER.email,
-      action,
-      table_name:table,
-      summary,
-      created_at:new Date().toISOString()
+    const resp=await fetch('/.netlify/functions/log-action',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary})
     });
-    if(error){
-      console.error('[AUDIT LOG ERROR]',error.message,error.details);
-      // 仍然继续，不中断主操作
-    }else{
-      console.log('[AUDIT LOG OK]',action,table,summary);
-    }
+    if(!resp.ok) console.error('[AUDIT LOG ERROR]',resp.status,await resp.text());
+    else console.log('[AUDIT LOG OK]',action,table,summary);
   }catch(e){
     console.error('[AUDIT LOG EXCEPTION]',e.message);
   }
