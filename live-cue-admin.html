@@ -2855,7 +2855,8 @@ async function renderAudit(){
 }
 async function logAction(action,table,summary){
   if(!CUR_USER) return;
-  await db.from('audit_logs').insert({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary}).catch(()=>{});
+  const {error}=await db.from('audit_logs').insert({user_id:CUR_USER.id,user_email:CUR_USER.email,action,table_name:table,summary});
+  if(error) console.error('audit log failed:',error.message,error.code);
 }
 
 function statusBadge(s){
