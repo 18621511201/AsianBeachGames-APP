@@ -30,7 +30,8 @@
       "mcp__Claude_Preview__preview_start",
       "Bash(mkdir -p ~/Desktop/商务系统)",
       "Bash(mv /Users/romandemac/Desktop/亚沙APP/quotation-system.html ~/Desktop/商务系统/)",
-      "Bash(open /Users/romandemac/Desktop/商务系统/quotation-system.html)"
+      "Bash(open /Users/romandemac/Desktop/商务系统/quotation-system.html)",
+      "Bash(bash /Users/romandemac/Desktop/亚沙APP/deploy.sh \"perf: 并行加载仪表盘数据，添加DNS预连接\")"
     ]
   }
 }

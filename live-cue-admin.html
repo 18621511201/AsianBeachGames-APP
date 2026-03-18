@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Live-CUE 管理后台</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://mdgfcgxtlxgzkvoiqonp.supabase.co">
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
@@ -570,10 +574,12 @@ async function show(page){
 /* ── DASHBOARD ── */
 async function renderDashboard(){
   document.getElementById('content').innerHTML='<div style="text-align:center;padding:60px;color:var(--t3)">加载中…</div>';
-  const [{data:ev},{data:vn}]=await Promise.all([
+  const [{data:ev},{data:vn},{data:rec}]=await Promise.all([
     db.from('events').select('status,is_medal_event'),
-    db.from('venues').select('id,is_active')
+    db.from('venues').select('*').order('name'),
+    db.from('events').select('*').order('start_time').limit(10)
   ]);
+  if(!VENUES.length) VENUES=vn||[];
   const now=Date.now();
   const live=(ev||[]).filter(e=>e.status==='live').length;
   const sched=(ev||[]).filter(e=>e.status==='scheduled').length;
@@ -616,10 +622,8 @@ async function renderDashboard(){
       </div>
       <div id="dashEvts"><div style="padding:20px;text-align:center;color:var(--t3)">加载中…</div></div>
     </div>`;
-  // Recent events
-  const {data:rec}=await db.from('events').select('*').order('start_time').limit(10);
+  // Recent events (already fetched in parallel above)
   if(!rec||!rec.length){document.getElementById('dashEvts').innerHTML='<div style="padding:20px;text-align:center;color:var(--t3)">暂无赛事数据</div>';return;}
-  await loadVenueMap();
   document.getElementById('dashEvts').innerHTML=`<div class="table-wrap"><table>
     <tr><th>赛事</th><th>场馆</th><th>赛次</th><th>开始时间</th><th>结束时间</th><th>状态</th><th>操作</th></tr>
     ${rec.map(e=>`<tr>

@@ -1,8 +1,8 @@
 functionsDirectory = "/Users/romandemac/Desktop/亚沙APP/netlify/functions"
 functionsDirectoryOrigin = "config-v1"
+redirectsOrigin = "config"
 plugins = []
 headers = []
-redirects = []
 
 [build]
 publish = "/Users/romandemac/Desktop/亚沙APP"
@@ -27,3 +27,27 @@ functions = "/Users/romandemac/Desktop/亚沙APP/netlify/functions"
 
 [functions."*"]
 node_bundler = "esbuild"
+
+[[redirects]]
+from = "/"
+to = "/live-cue-themes.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
+
+[[redirects]]
+from = "/admin"
+to = "/live-cue-admin.html"
+status = 200.0
+force = false
+
+[redirects.query]
+
+[redirects.conditions]
+
+[redirects.headers]
