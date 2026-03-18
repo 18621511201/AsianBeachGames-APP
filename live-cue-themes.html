@@ -684,21 +684,38 @@ function updateRoundFilter(){
    REALTIME SUBSCRIPTION
 ═══════════════════════════════════════════════ */
 let _rtCh=null;
+let _rtGapTimer=null;
 function setupRealtime(){
   if(_rtCh){try{db.removeChannel(_rtCh);}catch(_){} _rtCh=null;}
+  if(_rtGapTimer){clearTimeout(_rtGapTimer);_rtGapTimer=null;}
   _rtCh=db.channel('live-cue')
     .on('postgres_changes',{event:'*',schema:'public',table:'events'},p=>{
       const {eventType:t,new:nw,old:ol}=p;
-      // INSERT: only add if it falls within the current view window
       if(t==='INSERT') allEvts.push(nw);
       else if(t==='UPDATE'){const i=allEvts.findIndex(e=>e.id===nw.id);if(i>=0)allEvts[i]=nw;}
       else if(t==='DELETE') allEvts=allEvts.filter(e=>e.id!==ol.id);
       renderRows(gridW()); refreshCounts();
+      // 重置间隙检测计时器
+      clearTimeout(_rtGapTimer);
+      _rtGapTimer=null;
     })
     .on('postgres_changes',{event:'*',schema:'public',table:'venues'},()=>loadData())
     .subscribe(s=>{
-      if(s==='SUBSCRIBED') dbStatus('live',isZh?'实时同步':'Realtime');
-      else if(s==='CHANNEL_ERROR') dbStatus('error',isZh?'实时失败':'RT Error');
+      if(s==='SUBSCRIBED'){
+        dbStatus('live',isZh?'实时同步':'Realtime');
+        console.log('[RT] Subscribed to live-cue channel');
+      }
+      else if(s==='CHANNEL_ERROR'){
+        dbStatus('error',isZh?'实时失败':'RT Error');
+        console.error('[RT] Channel error, will auto-refresh in 3s');
+        // 3秒后自动刷新数据
+        if(!_rtGapTimer){
+          _rtGapTimer=setTimeout(()=>{
+            console.log('[RT] Auto-refreshing due to channel error');
+            loadData();
+          }, 3000);
+        }
+      }
     });
 }
 
@@ -1728,6 +1745,17 @@ window.addEventListener('DOMContentLoaded',async()=>{
   },200);
 });
 window.addEventListener('resize',()=>render());
+
+// 监听控制台警告，自动处理Realtime event gap
+const origConsoleWarn=console.warn;
+console.warn=function(...args){
+  const msg=args[0]?.toString?.();
+  if(msg?.includes('event gap detected')){
+    console.log('[AUTO-RECOVERY] Event gap detected, reloading data...');
+    loadData();
+  }
+  origConsoleWarn.apply(console,args);
+};
 
 /* ═══════════════════════════════════════════════
    KEYBOARD SHORTCUTS  (broadcast quick-ops)

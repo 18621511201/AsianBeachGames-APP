@@ -1,14 +1,13 @@
+functionsDirectory = "/Users/romandemac/Desktop/亚沙APP/netlify/functions"
+functionsDirectoryOrigin = "config-v1"
 plugins = []
 headers = []
 redirects = []
 
-[functions]
-
-[functions."*"]
-
 [build]
-publish = "/Users/romandemac/Desktop/Asian Beach APP"
-publishOrigin = "default"
+publish = "/Users/romandemac/Desktop/亚沙APP"
+publishOrigin = "config"
+functions = "/Users/romandemac/Desktop/亚沙APP/netlify/functions"
 
 [build.environment]
 
@@ -23,3 +22,8 @@ publishOrigin = "default"
 [build.processing.js]
 
 [build.services]
+
+[functions]
+
+[functions."*"]
+node_bundler = "esbuild"
