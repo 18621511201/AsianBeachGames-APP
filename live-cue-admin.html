@@ -6,8 +6,6 @@
 <title>Live-CUE 管理后台</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js"></script>
 <style>
 :root{--bg:#f0ebe2;--surf:#ffffff;--elev:#faf7f3;--gl:rgba(0,0,0,.04);--b1:rgba(0,0,0,.08);--b2:rgba(0,0,0,.13);--acc:#b85530;--acl:#9a4525;--ag:rgba(184,85,48,.22);--live:#dc2626;--up:#b45309;--ok:#16a34a;--red:#dc2626;--t1:#1c1008;--t2:#5c4a3a;--t3:#9c8573;--mono:'JetBrains Mono',monospace;--sans:'Inter',sans-serif;--r:8px}
 *,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
@@ -464,6 +462,15 @@ input[type=checkbox].cb{width:15px;height:15px;accent-color:var(--acc);cursor:po
 </div>
 
 <script>
+/* ── LAZY SCRIPT LOADER ── */
+function loadScript(url){
+  return new Promise((resolve,reject)=>{
+    if(document.querySelector(`script[src="${url}"]`)){resolve();return;}
+    const s=document.createElement('script');s.src=url;
+    s.onload=resolve;s.onerror=reject;document.head.appendChild(s);
+  });
+}
+
 /* ── SUPABASE ── */
 const SB_URL='https://mdgfcgxtlxgzkvoiqonp.supabase.co';
 const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kZ2ZjZ3h0bHhnemt2b2lxb25wIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NTcwMjIsImV4cCI6MjA4OTEzMzAyMn0.ds9Ab_HkRNsUDSUrTlfJ5NpmlywgWwotNei4YX3Oo-k';
@@ -1574,6 +1581,7 @@ async function processSmartFile(file){
 }
 
 async function readExcelAsText(file){
+  if(typeof XLSX==='undefined') await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js');
   const buf=await file.arrayBuffer();
   const wb=XLSX.read(buf,{type:'array'});
   let text='';
@@ -1586,6 +1594,7 @@ async function readExcelAsText(file){
 }
 
 async function readDocxAsText(file){
+  if(typeof mammoth==='undefined') await loadScript('https://cdn.jsdelivr.net/npm/mammoth@1.7.2/mammoth.browser.min.js');
   const buf=await file.arrayBuffer();
   const result=await mammoth.extractRawText({arrayBuffer:buf});
   return result.value;
@@ -2472,12 +2481,12 @@ async function doExport(){
   const rtypeLabel=rtype==='schedule'?'赛程表':'传送表';
   const dateLabel=dateFilter==='all'?'全赛程':(()=>{const dt=new Date(dateFilter+'T00:00:00');return `${dt.getFullYear()}年${dt.getMonth()+1}月${dt.getDate()}日`;})();
   const fileName=`第六届亚洲沙滩运动会_${rtypeLabel}_${dateLabel}`;
-  if(fmt==='excel') exportAsExcel(events,rtype,fileName,nowStr,dateLabel);
+  if(fmt==='excel') await exportAsExcel(events,rtype,fileName,nowStr,dateLabel);
   else exportAsPdf(events,rtype,fileName,nowStr,dateLabel);
 }
 
-function exportAsExcel(events,rtype,fileName,nowStr,dateLabel){
-  if(typeof XLSX==='undefined'){alert('Excel库未加载，请刷新页面重试');return;}
+async function exportAsExcel(events,rtype,fileName,nowStr,dateLabel){
+  if(typeof XLSX==='undefined') await loadScript('https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js');
   const WB=XLSX.utils.book_new();
   const isT=(rtype==='transmission');
   const groups={};

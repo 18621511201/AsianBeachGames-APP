@@ -1,3 +1,21 @@
 {
-	"siteId": "b327d201-6b20-43ea-b944-f0a7f68a2d7a"
+	"siteId": "b327d201-6b20-43ea-b944-f0a7f68a2d7a",
+	"geolocation": {
+		"data": {
+			"city": "Tokyo",
+			"country": {
+				"code": "JP",
+				"name": "Japan"
+			},
+			"subdivision": {
+				"code": "13",
+				"name": "Tokyo"
+			},
+			"timezone": "Asia/Tokyo",
+			"latitude": 35.6893,
+			"longitude": 139.6899,
+			"postalCode": "151-0053"
+		},
+		"timestamp": 1773829638912
+	}
 }

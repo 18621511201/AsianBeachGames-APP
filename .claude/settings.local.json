@@ -26,7 +26,11 @@
       "Bash(grep -r eyJ '/Users/romandemac/Desktop/Asian Beach APP' --include=*.js --include=*.ts --include=*.json -h)",
       "Bash(netlify deploy:*)",
       "Bash(find /Users/romandemac -maxdepth 5 -type d -name *Asian* -o -type d -name *Beach*)",
-      "Bash(find /Users/romandemac -maxdepth 10 -name *.html -not -path */node_modules/* -not -path */.git/* -not -path */Library/*)"
+      "Bash(find /Users/romandemac -maxdepth 10 -name *.html -not -path */node_modules/* -not -path */.git/* -not -path */Library/*)",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(mkdir -p ~/Desktop/商务系统)",
+      "Bash(mv /Users/romandemac/Desktop/亚沙APP/quotation-system.html ~/Desktop/商务系统/)",
+      "Bash(open /Users/romandemac/Desktop/商务系统/quotation-system.html)"
     ]
   }
 }

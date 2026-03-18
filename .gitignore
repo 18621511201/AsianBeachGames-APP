@@ -3,3 +3,6 @@
 *.local
 node_modules/
 .claude/
+
+# Local Netlify folder
+.netlify
