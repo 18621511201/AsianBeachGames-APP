@@ -243,6 +243,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg-base);color:var(--t1);
 .ev-t{font-size:8px;font-family:var(--mono);color:rgba(255,255,255,.55)}
 [data-theme="chinese"] .ev-name{font-family:var(--serif);font-size:10px}
 [data-theme="fashion"] .ev-name{font-family:var(--serif);font-weight:600}
+/* merged multi-event block */
+.ev-merged .evi{justify-content:flex-start;padding:3px 6px;gap:0;overflow-y:hidden}
+.ev-seg{display:flex;flex-direction:column;padding:2px 0;flex-shrink:0}
+.ev-seg+.ev-seg{border-top:1px solid rgba(255,255,255,.18);margin-top:1px;padding-top:2px}
+.ev-seg .ev-name{font-size:10px}
+.ev-seg .ev-t{font-size:7.5px}
 
 /* ══ STATUS BAR ══════════════════════════════════════════════ */
 .sbar{flex-shrink:0;height:var(--barh);background:var(--bg-surface);border-top:1px solid var(--b1);display:flex;align-items:center;padding:0 22px;gap:0;overflow-x:auto;scrollbar-width:none}
@@ -968,30 +974,68 @@ function renderRows(gw){
       for(let m=0;m<=totalMins;m+=glStep){
         const gl=document.createElement('div');gl.className='gl';gl.style.left=(m*PPM)+'px';row.appendChild(gl);
       }
-      ln.evts.forEach(ev=>{
+      // Merge adjacent events (gap ≤ 30 min) into single blocks
+      const MERGE_GAP=30*60000;
+      const visEvts=ln.evts.filter(ev=>{
         const st=evStatus(ev);
-        if(sf!=='all'&&st!==sf) return;
-        if(selectedRounds.size>0&&!selectedRounds.has(ev.round)) return;
-        const startX=tsToX(ev.start_time);
-        const endX=tsToX(ev.end_time);
+        if(sf!=='all'&&st!==sf) return false;
+        if(selectedRounds.size>0&&!selectedRounds.has(ev.round)) return false;
+        return true;
+      }).sort((a,b)=>a.start_time-b.start_time);
+      const groups=[];
+      visEvts.forEach(ev=>{
+        if(groups.length&&ev.start_time-groups[groups.length-1].end<=MERGE_GAP){
+          const g=groups[groups.length-1];
+          g.evts.push(ev);
+          g.end=Math.max(g.end,ev.end_time);
+        } else {
+          groups.push({start:ev.start_time,end:ev.end_time,evts:[ev]});
+        }
+      });
+      groups.forEach(g=>{
+        const startX=tsToX(g.start);
+        const endX=tsToX(g.end);
         if(endX<0||startX>gw) return;
         const left=Math.max(startX,0);
-        const width=Math.max(endX-startX,24);
+        const width=Math.max(endX-g.start/1+g.start/1-tsToX(g.start)+endX-startX,28);
+        const clampedWidth=Math.max(endX-Math.max(startX,0),28);
+        const merged=g.evts.length>1;
+        // Use the "worst" status for merged block styling
+        const statusPriority={live:3,upcoming:2,finished:0};
+        const st=g.evts.reduce((best,ev)=>{
+          const s=evStatus(ev);
+          return (statusPriority[s]||1)>(statusPriority[best]||1)?s:best;
+        },'finished');
         const b=document.createElement('div');
-        b.className=`ev ${st}`;
-        b.style.left=left+'px'; b.style.width=width+'px';
+        b.className=`ev ${st}${merged?' ev-merged':''}`;
+        b.style.left=Math.max(startX,0)+'px';
+        b.style.width=clampedWidth+'px';
         b.style.setProperty('--ec',venue.color);
         styleEvt(b,venue,st);
-        const sh=fmtTs(ev.start_time),eh=fmtTs(ev.end_time);
-        b.innerHTML=`<div class="evi">
-          ${ev.is_medal_event?'<span class="ev-medal">🥇</span>':''}
-          <span class="ev-name">${isZh?ev.name:getEventName(ev.name)}</span>
-          ${ln.label?`<span class="ev-rnd" style="opacity:.9">${ln.label}</span>`:`<span class="ev-rnd">${getRoundName(ev.round)}</span>`}
-          <span class="ev-t">${sh}–${eh}</span>
-        </div>`;
-        b.addEventListener('mouseenter',e=>showTT(e,venue,ev,st,ln.label));
-        b.addEventListener('mousemove',moveTT);
-        b.addEventListener('mouseleave',hideTT);
+        if(merged){
+          const segs=g.evts.map(ev=>{
+            const sh=fmtTs(ev.start_time),eh=fmtTs(ev.end_time);
+            const name=isZh?ev.name:getEventName(ev.name);
+            return `<div class="ev-seg">${ev.is_medal_event?'<span class="ev-medal">🥇</span>':''}<span class="ev-name">${name}</span><span class="ev-t">${sh}–${eh}</span></div>`;
+          }).join('');
+          b.innerHTML=`<div class="evi">${segs}</div>`;
+          // Tooltip on hover for merged block
+          b.addEventListener('mouseenter',e=>showTT(e,venue,g.evts[0],st,ln.label));
+          b.addEventListener('mousemove',moveTT);
+          b.addEventListener('mouseleave',hideTT);
+        } else {
+          const ev=g.evts[0];
+          const sh=fmtTs(ev.start_time),eh=fmtTs(ev.end_time);
+          b.innerHTML=`<div class="evi">
+            ${ev.is_medal_event?'<span class="ev-medal">🥇</span>':''}
+            <span class="ev-name">${isZh?ev.name:getEventName(ev.name)}</span>
+            ${ln.label?`<span class="ev-rnd" style="opacity:.9">${ln.label}</span>`:`<span class="ev-rnd">${getRoundName(ev.round)}</span>`}
+            <span class="ev-t">${sh}–${eh}</span>
+          </div>`;
+          b.addEventListener('mouseenter',e=>showTT(e,venue,ev,st,ln.label));
+          b.addEventListener('mousemove',moveTT);
+          b.addEventListener('mouseleave',hideTT);
+        }
         row.appendChild(b);
       });
       gr.appendChild(row);
